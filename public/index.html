@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Câu Lạc Bộ Guitar Cổ Điển</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (Xuất Excel) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- SUPABASE -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-[#f4f6f8] min-h-screen text-slate-800 font-sans selection:bg-amber-300 selection:text-amber-900 pb-20">
@@ -16,14 +21,19 @@
     <div id="auth-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] transition-opacity duration-500">
         <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl relative overflow-hidden fade-in-up border border-slate-100">
             <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-gradient-to-br from-amber-600 to-rose-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-900/30"><i class="fa-solid fa-guitar text-4xl text-white"></i></div>
+                <div class="w-20 h-20 bg-gradient-to-br from-amber-600 to-rose-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-900/30">
+                    <i class="fa-solid fa-guitar text-4xl text-white"></i>
+                </div>
                 <h2 class="text-xl font-black text-slate-800 uppercase tracking-wider">HỆ THỐNG QUẢN LÝ</h2>
                 <p class="text-sm text-slate-500 mt-1 font-medium">Vui lòng đăng nhập để tiếp tục</p>
             </div>
+
             <div class="flex bg-slate-100 p-1.5 rounded-xl mb-6 shadow-inner">
                 <button id="btn-show-login" onclick="toggleAuthMode('login')" class="flex-1 py-2.5 rounded-lg text-sm font-bold bg-white text-amber-900 shadow transition-all">Đăng Nhập</button>
                 <button id="btn-show-register" onclick="toggleAuthMode('register')" class="flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 transition-all hover:text-slate-800">Đăng Ký</button>
             </div>
+
+            <!-- FORM ĐĂNG NHẬP -->
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
                 <div><input type="email" id="login-email" required class="custom-input" placeholder="Email đăng nhập..."></div>
                 <div><input type="password" id="login-password" required class="custom-input" placeholder="Mật khẩu..."></div>
@@ -31,25 +41,37 @@
                     <label class="flex items-center gap-2 cursor-pointer text-slate-600 font-medium"><input type="checkbox" checked class="accent-amber-700 w-4 h-4 rounded"> Ghi nhớ</label>
                     <button type="button" onclick="forgotPassword()" class="text-amber-700 font-bold hover:text-amber-800 hover:underline transition-all">Quên mật khẩu?</button>
                 </div>
-                <button type="submit" id="login-btn" class="w-full bg-gradient-to-r from-amber-700 to-rose-900 hover:from-amber-800 hover:to-rose-950 text-white font-bold py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]">Đăng Nhập</button>
+                <button type="submit" id="login-btn" class="w-full bg-gradient-to-r from-amber-700 to-rose-900 hover:from-amber-800 hover:to-rose-950 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-amber-900/20 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]">
+                    Đăng Nhập
+                </button>
             </form>
+
+            <!-- FORM ĐĂNG KÝ -->
             <form id="register-form" onsubmit="handleRegisterUser(event)" class="space-y-5 hidden">
                 <div><input type="email" id="reg-user-email" required class="custom-input" placeholder="Email của bạn..."></div>
                 <div><input type="password" id="reg-user-password" required class="custom-input" minlength="6" placeholder="Mật khẩu (Ít nhất 6 ký tự)"></div>
                 <div><input type="password" id="reg-user-confirm" required class="custom-input" minlength="6" placeholder="Nhập lại mật khẩu..."></div>
-                <button type="submit" id="reg-btn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 mt-2 transform hover:scale-[1.02]">Tạo Tài Khoản</button>
+                <button type="submit" id="reg-btn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 mt-2 transform hover:scale-[1.02]">
+                    Tạo Tài Khoản
+                </button>
             </form>
         </div>
     </div>
 
-    <!-- Thanh Navigation -->
+    <!-- Thanh Navigation Xịn xò -->
     <nav class="bg-gradient-to-r from-[#2c1414] via-[#4a1c1c] to-[#1f1616] text-white shadow-lg sticky top-0 z-40 no-print border-b border-amber-900/50">
         <div class="max-w-7xl mx-auto px-4 py-3 md:py-4 flex flex-col md:flex-row justify-between items-center gap-3">
             <div class="flex items-center space-x-3 cursor-pointer w-full md:w-auto group" onclick="switchTab('home')">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shrink-0 group-hover:scale-105 transition-transform"><i class="fa-solid fa-guitar text-xl text-amber-950"></i></div>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shrink-0 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-guitar text-xl text-amber-950"></i>
+                </div>
                 <div class="flex-1 truncate">
-                    <h1 class="font-extrabold text-sm md:text-base tracking-widest uppercase text-amber-50 truncate">CÂU LẠC BỘ GUITAR CỔ ĐIỂN <br class="md:hidden"> LIÊN TRƯỜNG</h1>
-                    <p id="user-display-email" class="text-[10px] font-semibold text-amber-300/80 mt-0.5 truncate"><i class="fa-solid fa-circle-user mr-1"></i>Đang tải...</p>
+                    <h1 class="font-extrabold text-sm md:text-base tracking-widest uppercase text-amber-50 truncate">
+                        CÂU LẠC BỘ GUITAR CỔ ĐIỂN <br class="md:hidden"> LIÊN TRƯỜNG
+                    </h1>
+                    <p id="user-display-email" class="text-[10px] font-semibold text-amber-300/80 mt-0.5 truncate flex items-center">
+                        <i class="fa-solid fa-circle-user mr-1"></i> Đang tải...
+                    </p>
                     <span id="user-role-badge" class="ml-1 px-1.5 py-0.5 bg-rose-600 text-white text-[9px] rounded font-bold uppercase hidden"></span>
                 </div>
             </div>
@@ -58,17 +80,24 @@
                 <button onclick="switchTab('home')" id="btn-tab-home" class="nav-pill active"><i class="fa-solid fa-house"></i> Home</button>
                 <button onclick="switchTab('register')" id="btn-tab-register" class="nav-pill"><i class="fa-solid fa-pen-nib"></i> Đăng Ký</button>
                 <button onclick="switchTab('lookup')" id="btn-tab-lookup" class="nav-pill"><i class="fa-solid fa-search"></i> Tra Cứu</button>
+                
+                <!-- 2 Nút này bị ẩn nếu chỉ là Member -->
                 <button onclick="switchTab('member-book')" id="btn-tab-member-book" class="nav-pill hidden"><i class="fa-solid fa-book-open"></i> Sổ TV</button>
                 <button onclick="switchTab('register-book')" id="btn-tab-register-book" class="nav-pill hidden"><i class="fa-solid fa-plus"></i> Lập Sổ</button>
+                
                 <button onclick="switchTab('gallery')" id="btn-tab-gallery" class="nav-pill border-amber-500/30 text-amber-300"><i class="fa-solid fa-images"></i> Media</button>
                 
                 <div class="w-px h-6 bg-white/10 mx-1 shrink-0"></div>
                 
+                <!-- Nút Quản Trị bị ẩn nếu chỉ là Member -->
                 <button onclick="openAdminModal()" id="btn-admin-nav" class="shrink-0 bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-full transition-all shadow-md flex items-center gap-1.5 text-xs font-bold relative hidden">
                     <i class="fa-solid fa-shield-halved"></i> Quản Trị
                     <span id="nav-badge-count" class="hidden absolute -top-1 -right-1 bg-amber-400 text-amber-950 text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-black animate-pulse">0</span>
                 </button>
-                <button onclick="handleLogout()" class="shrink-0 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full transition-all flex items-center justify-center text-xs"><i class="fa-solid fa-right-from-bracket"></i></button>
+                
+                <button onclick="handleLogout()" class="shrink-0 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full transition-all flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
         </div>
     </nav>
@@ -83,14 +112,24 @@
                 <div class="absolute bottom-0 right-0 w-64 h-64 bg-rose-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none"></div>
                 
                 <div class="relative z-10 space-y-4">
-                    <span class="inline-block px-4 py-1 rounded-full bg-white/10 text-amber-200 text-xs font-bold uppercase tracking-widest backdrop-blur-sm border border-white/10 mb-2">CÂU LẠC BỘ NGHỆ THUẬT LIÊN TRƯỜNG THPT</span>
-                    <h2 class="text-3xl md:text-5xl font-black text-white leading-tight drop-shadow-lg">TRANG CHỦ QUẢN LÝ <br> <span class="text-amber-400">CÂU LẠC BỘ GUITAR CỔ ĐIỂN</span></h2>
-                    <p class="text-white/70 max-w-2xl mx-auto text-sm md:text-base font-medium tracking-wide mt-4">Hệ thống đăng ký tuyển thành viên, tra cứu thông tin phòng thi, điểm số và sổ thành viên chính thức.</p>
+                    <span class="inline-block px-4 py-1 rounded-full bg-white/10 text-amber-200 text-xs font-bold uppercase tracking-widest backdrop-blur-sm border border-white/10 mb-2">
+                        CÂU LẠC BỘ NGHỆ THUẬT LIÊN TRƯỜNG THPT
+                    </span>
+                    <h2 class="text-3xl md:text-5xl font-black text-white leading-tight drop-shadow-lg">
+                        TRANG CHỦ QUẢN LÝ <br> 
+                        <span class="text-amber-400">CÂU LẠC BỘ GUITAR CỔ ĐIỂN</span>
+                    </h2>
+                    <p class="text-white/70 max-w-2xl mx-auto text-sm md:text-base font-medium tracking-wide mt-4">
+                        Hệ thống đăng ký tuyển thành viên, tra cứu thông tin phòng thi, điểm số và sổ thành viên chính thức.
+                    </p>
                 </div>
             </div>
 
             <div class="pt-2">
-                <div class="flex items-center gap-3 mb-6"><div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><i class="fa-solid fa-layer-group"></i></div><h3 class="text-sm font-black text-slate-700 uppercase tracking-widest">Tính Năng Cốt Lõi</h3></div>
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><i class="fa-solid fa-layer-group"></i></div>
+                    <h3 class="text-sm font-black text-slate-700 uppercase tracking-widest">Tính Năng Cốt Lõi</h3>
+                </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <button onclick="switchTab('register')" class="group relative bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-300 flex items-center text-left gap-5 overflow-hidden">
@@ -117,15 +156,18 @@
                         <div class="relative z-10 flex-1"><h3 class="text-[17px] font-black text-slate-800 group-hover:text-purple-700 transition-colors">Lập Sổ Mới</h3><p class="text-xs text-slate-500 mt-1.5 font-medium leading-relaxed">Khai báo thông tin cá nhân để tạo sổ trực tuyến trên hệ thống.</p></div>
                     </button>
 
-                    <button onclick="switchTab('gallery')" id="card-gallery" class="group relative md:col-span-2 bg-gradient-to-r from-amber-50 to-orange-50 p-6 md:p-8 rounded-[2rem] border border-amber-100 shadow-md hover:shadow-xl transition-all duration-300 flex items-center text-left gap-6 overflow-hidden">
+                    <button onclick="switchTab('gallery')" class="group relative md:col-span-2 bg-gradient-to-r from-amber-50 to-orange-50 p-6 md:p-8 rounded-[2rem] border border-amber-100 shadow-md hover:shadow-xl transition-all duration-300 flex items-center text-left gap-6 overflow-hidden">
                         <div class="absolute -right-10 -top-10 text-amber-500/10 text-9xl transition-transform duration-700 group-hover:scale-110 group-hover:rotate-12 pointer-events-none"><i class="fa-solid fa-camera-retro"></i></div>
                         <div class="w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-amber-600/30 group-hover:scale-105 transition-transform relative z-10"><i class="fa-solid fa-images"></i></div>
                         <div class="relative z-10 flex-1"><h3 class="text-lg md:text-xl font-black text-amber-900 drop-shadow-sm">Thư Viện Ảnh & Video</h3><p class="text-xs md:text-sm text-amber-800/80 mt-1.5 font-medium leading-relaxed max-w-xl">Không gian lưu trữ và chia sẻ mọi khoảnh khắc biểu diễn, sinh hoạt đáng nhớ của Câu lạc bộ.</p></div>
                     </button>
                 </div>
 
+                <!-- Nút truy cập quản trị -->
                 <div id="btn-admin-home" class="pt-10 text-center pb-6 hidden">
-                    <button onclick="openAdminModal()" class="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:shadow-slate-900/30 transition-all flex items-center justify-center gap-3 mx-auto text-sm tracking-wide transform hover:-translate-y-1"><i class="fa-solid fa-unlock-keyhole text-amber-400 text-lg"></i> Quản Trị Hệ Thống (BCN)</button>
+                    <button onclick="openAdminModal()" class="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:shadow-slate-900/30 transition-all flex items-center justify-center gap-3 mx-auto text-sm tracking-wide transform hover:-translate-y-1">
+                        <i class="fa-solid fa-unlock-keyhole text-amber-400 text-lg"></i> Quản Trị Hệ Thống (BCN)
+                    </button>
                 </div>
             </div>
         </div>
@@ -138,19 +180,271 @@
                         <h2 class="text-2xl font-black text-amber-900 flex items-center gap-3"><i class="fa-solid fa-photo-film text-amber-600 text-3xl"></i> THƯ VIỆN MEDIA</h2>
                         <p class="text-sm text-slate-500 mt-1 font-medium">Lưu giữ ảnh và video chất lượng cao của Câu lạc bộ.</p>
                     </div>
+                    <!-- Nút Tải media lên (Ẩn với Member) -->
                     <div class="relative w-full md:w-auto hidden" id="upload-media-container">
                         <input type="file" id="media-upload" accept="image/*,video/*" multiple onchange="handleMediaUpload(event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
-                        <button class="w-full md:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 px-8 rounded-xl text-sm transition-all shadow-lg hover:shadow-amber-900/30 flex justify-center items-center gap-3 transform hover:scale-105"><i class="fa-solid fa-cloud-arrow-up text-lg"></i> Tải Media Lên</button>
+                        <button class="w-full md:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 px-8 rounded-xl text-sm transition-all shadow-lg hover:shadow-amber-900/30 flex justify-center items-center gap-3 transform hover:scale-105">
+                            <i class="fa-solid fa-cloud-arrow-up text-lg"></i> Tải Media Lên
+                        </button>
                     </div>
                 </div>
                 <div id="media-gallery-container" class="media-grid pt-8"></div>
             </div>
         </div>
 
-        <!-- BẠN DÁN TIẾP CÁC TAB CÒN LẠI VÀO ĐÂY (Register, Lookup, Member Book, Register Book, Print Area) -->
-        <!-- COPY TỪ BẢN TRƯỚC DÁN VÀO ĐỂ TRÁNH TRÀN KÝ TỰ TIN NHẮN -->
-        
-        <!-- MODAL QUẢN TRỊ (CÓ THÊM TAB PHÂN QUYỀN) -->
+        <!-- TAB ĐĂNG KÝ HỌC SINH -->
+        <div id="tab-register" class="tab-content hidden max-w-4xl mx-auto no-print">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-6 md:p-8 border-b border-slate-200 text-center relative">
+                    <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mx-auto mb-3 border border-slate-100"><i class="fa-solid fa-file-signature text-2xl text-amber-600"></i></div>
+                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest">Tuyển Sinh Mới</h3>
+                    <div class="text-lg md:text-2xl font-black text-slate-800 mt-1">PHIẾU ĐĂNG KÝ DỰ TUYỂN</div>
+                </div>
+
+                <form id="registrationForm" onsubmit="handleRegister(event)" class="p-6 md:p-8 space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                        <div class="md:col-span-1 flex flex-col items-center justify-start pt-2">
+                            <div class="w-32 h-40 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 hover:border-amber-400 transition-colors relative overflow-hidden group cursor-pointer">
+                                <img id="avatar-preview" src="" class="hidden w-full h-full object-cover">
+                                <div id="avatar-placeholder" class="text-center p-2 group-hover:scale-110 transition-transform"><i class="fa-solid fa-cloud-arrow-up text-slate-400 text-3xl mb-2"></i><span class="text-xs font-bold text-slate-500 block">Tải ảnh 3x4</span></div>
+                                <input type="file" id="photo" accept="image/*" onchange="previewImage(event)" class="absolute inset-0 opacity-0 cursor-pointer">
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="md:col-span-2"><label class="form-label">Họ và tên <span class="text-rose-500">*</span></label><input type="text" id="fullname" required placeholder="Nguyễn Văn A" class="custom-input"></div>
+                            <div><label class="form-label">Ngày sinh <span class="text-rose-500">*</span></label><input type="date" id="dob" required class="custom-input text-slate-600"></div>
+                            <div><label class="form-label">Giới tính <span class="text-rose-500">*</span></label><select id="gender" required class="custom-input text-slate-600"><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></div>
+                            <div><label class="form-label">Trường <span class="text-rose-500">*</span></label><input type="text" id="school" value="THPT Hồng Bàng" required class="custom-input font-semibold bg-slate-100" readonly></div>
+                            <div><label class="form-label">Lớp <span class="text-rose-500">*</span></label><input type="text" id="classroom" required placeholder="10A1" class="custom-input"></div>
+                            <div><label class="form-label">Số điện thoại <span class="text-rose-500">*</span></label><input type="tel" id="phone" required placeholder="0912345678" class="custom-input"></div>
+                            <div><label class="form-label">Email <span class="text-rose-500">*</span></label><input type="email" id="email" required placeholder="example@gmail.com" class="custom-input"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50/50 p-6 rounded-[1.5rem] border border-amber-200">
+                        <label class="block text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-music text-amber-600"></i> Lựa Chọn Môn Thi</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label class="flex items-center gap-3 p-4 rounded-xl bg-slate-100 border border-slate-200 opacity-80 cursor-not-allowed">
+                                <input type="checkbox" checked disabled class="w-5 h-5 rounded text-amber-800 accent-amber-700 cursor-not-allowed">
+                                <div><div class="font-bold text-slate-700 text-sm">Lý thuyết âm nhạc</div><div class="text-[10px] text-rose-500 font-bold uppercase mt-0.5">Bắt buộc</div></div>
+                            </label>
+                            <label class="flex items-center gap-3 p-4 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer group"><input type="radio" name="optional-subject" value="Guitar cổ điển" required class="w-5 h-5 accent-amber-600"><span class="font-bold text-slate-700 text-sm group-hover:text-amber-700 transition-colors">Guitar Cổ Điển</span></label>
+                            <label class="flex items-center gap-3 p-4 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer group"><input type="radio" name="optional-subject" value="Guitar đệm hát" required class="w-5 h-5 accent-amber-600"><span class="font-bold text-slate-700 text-sm group-hover:text-amber-700 transition-colors">Guitar Đệm Hát</span></label>
+                            <label class="flex items-center gap-3 p-4 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer group"><input type="radio" name="optional-subject" value="Thanh nhạc" required class="w-5 h-5 accent-amber-600"><span class="font-bold text-slate-700 text-sm group-hover:text-amber-700 transition-colors">Thanh Nhạc</span></label>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex items-start gap-3">
+                        <input type="checkbox" id="commitment-check" onchange="toggleSubmitBtn()" class="mt-1 w-5 h-5 rounded text-amber-800 accent-amber-600 shrink-0 cursor-pointer">
+                        <label for="commitment-check" class="text-xs font-semibold text-slate-600 leading-relaxed cursor-pointer">Tôi xin cam đoan tất cả thông tin khai báo trên là hoàn toàn chính xác. Tôi chấp nhận mọi quy định tuyển sinh của Câu lạc bộ. <span class="text-rose-500">*</span></label>
+                    </div>
+
+                    <div class="flex flex-col-reverse sm:flex-row justify-between items-center pt-4 gap-4">
+                        <button type="button" onclick="switchTab('home')" class="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors text-sm">Hủy bỏ</button>
+                        <button type="submit" id="submitBtn" disabled class="w-full sm:w-auto bg-slate-300 text-white font-bold py-3.5 px-8 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-not-allowed"><i class="fa-solid fa-paper-plane"></i> Gửi Hồ Sơ & In Phiếu</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB TRA CỨU HỒ SƠ THI CỦA THÍ SINH -->
+        <div id="tab-lookup" class="tab-content hidden max-w-5xl mx-auto no-print">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 p-8 text-center relative overflow-hidden">
+                    <div class="absolute right-0 top-0 opacity-10 text-8xl"><i class="fa-solid fa-magnifying-glass"></i></div>
+                    <h2 class="text-2xl font-black text-white relative z-10">TRA CỨU HỒ SƠ</h2>
+                    <p class="text-slate-400 text-sm mt-2 relative z-10">Xem thông tin phòng thi, điểm số và kết quả xét tuyển</p>
+                </div>
+                
+                <div class="p-6 md:p-8 space-y-8">
+                    <div class="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="lookup-keyword" placeholder="Nhập Mã phiếu / SĐT / Email..." class="w-full pl-11 pr-4 py-3.5 bg-transparent text-sm focus:outline-none font-medium" onkeyup="if(event.key==='Enter') searchCandidate()">
+                        </div>
+                        <button onclick="searchCandidate()" class="bg-amber-600 hover:bg-amber-700 text-white px-8 py-3.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg">Tìm Kiếm</button>
+                    </div>
+
+                    <div id="lookup-result-msg" class="text-sm hidden text-center"></div>
+
+                    <!-- PHIẾU TRA CỨU TO RÕ NÉT -->
+                    <div id="lookup-card-detail" class="hidden border border-slate-200 rounded-[2rem] p-6 md:p-8 space-y-6 shadow-xl shadow-slate-200/50 bg-white">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center text-xl"><i class="fa-solid fa-user-check"></i></div>
+                                <div><span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Mã hồ sơ</span><h3 id="lk-id" class="text-2xl font-black text-slate-800 font-mono tracking-wide"></h3></div>
+                            </div>
+                            <span id="lk-rank-badge" class="px-5 py-2 rounded-xl text-xs font-extrabold hidden shadow-sm border"></span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100 text-sm">
+                            <div><p class="text-[11px] text-slate-400 font-bold uppercase mb-1">Họ và tên</p><p id="lk-fullname" class="text-base font-extrabold text-slate-800"></p></div>
+                            <div><p class="text-[11px] text-slate-400 font-bold uppercase mb-1">Số Báo Danh</p><p id="lk-sbd" class="text-base font-mono font-bold text-blue-600"></p></div>
+                            <div><p class="text-[11px] text-slate-400 font-bold uppercase mb-1">Lớp</p><p class="text-base font-bold text-slate-800"><span id="lk-classroom"></span></p></div>
+                            <div class="sm:col-span-3 pt-4 border-t border-slate-200"><p class="text-[11px] text-slate-400 font-bold uppercase mb-1">Môn đăng ký</p><p id="lk-subjects" class="text-sm font-bold text-amber-700"></p></div>
+                        </div>
+
+                        <div id="lk-part23-box" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                                <h4 class="font-extrabold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-amber-500"></i> BẢNG ĐIỂM</h4>
+                                <span id="lk-score-status-tag" class="text-[10px] font-bold uppercase bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500 shadow-sm"></span>
+                            </div>
+                            <div class="p-6 space-y-6">
+                                <div id="lk-rooms-scores-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm"></div>
+                                <div class="border-t border-dashed border-slate-200 pt-5 space-y-3">
+                                    <div class="flex justify-between items-center text-base p-4 bg-amber-50/50 rounded-xl border border-amber-100"><span class="font-bold text-slate-600">Điểm Trung Bình:</span><span id="lk-dtb" class="font-black text-amber-600 text-2xl"></span></div>
+                                    <div id="lk-conclusion-box" class="flex justify-between items-center p-4 bg-slate-50 rounded-xl hidden"><span class="font-bold text-slate-600">Kết luận:</span><span id="lk-conclusion" class="font-bold text-base"></span></div>
+                                    <div id="lk-rank-box" class="flex justify-between items-center p-4 bg-slate-50 rounded-xl hidden"><span class="font-bold text-slate-600">Xếp loại:</span><span id="lk-rank" class="font-extrabold uppercase text-emerald-600 text-base"></span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PHẦN PHÚC TRA -->
+                        <div id="phuctra-section" class="hidden">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                <div><h4 class="font-bold text-slate-800 text-sm">Hỗ trợ thí sinh</h4><p id="phuctra-status-text" class="text-xs text-slate-500 mt-1">Gửi yêu cầu chấm lại nếu bạn thấy điểm chưa chính xác.</p></div>
+                                <button id="btn-show-phuctra-form" onclick="togglePhucTraForm()" class="shrink-0 bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-100 text-slate-700 font-bold py-2.5 px-5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm"><i class="fa-solid fa-headset text-amber-600"></i> Phúc Tra Điểm</button>
+                            </div>
+
+                            <div id="phuctra-form-box" class="hidden mt-4 bg-white p-6 rounded-2xl border-2 border-amber-200 shadow-lg space-y-5 relative overflow-hidden">
+                                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h5 class="font-black text-amber-800 text-sm uppercase flex items-center gap-2"><i class="fa-solid fa-file-circle-exclamation"></i> Đơn Xin Phúc Tra</h5>
+                                    <button onclick="togglePhucTraForm()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <form onsubmit="handleSubmitPhucTra(event)" class="space-y-5 text-sm">
+                                    <div><label class="form-label">Chọn môn xin chấm lại: <span class="text-rose-500">*</span></label><div id="phuctra-checkbox-subjects" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div></div>
+                                    <div><label class="form-label">Lý do phúc tra: <span class="text-rose-500">*</span></label><textarea id="phuctra-content-input" rows="3" required placeholder="Ghi rõ thắc mắc của bạn..." class="custom-input"></textarea></div>
+                                    <div class="flex justify-end gap-3 pt-2">
+                                        <button type="button" onclick="togglePhucTraForm()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-colors">Hủy</button>
+                                        <button type="submit" class="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"><i class="fa-solid fa-paper-plane"></i> Gửi Đơn</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div id="lookup-reappeal-history-container" class="mt-6 hidden">
+                                <h5 class="font-extrabold text-slate-700 text-xs uppercase mb-3 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-slate-400"></i> Lịch Sử Phản Hồi</h5>
+                                <div id="lookup-reappeal-history-list" class="space-y-3"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
+                            <button onclick="viewLookupCandidatePrint()" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"><i class="fa-solid fa-print"></i> In Phiếu Hồ Sơ</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB SỔ THÀNH VIÊN CÁ NHÂN -->
+        <div id="tab-member-book" class="tab-content hidden max-w-5xl mx-auto no-print">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 md:p-8 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-black text-slate-800 flex items-center gap-2"><i class="fa-solid fa-book-journal-whills text-emerald-600"></i> SỔ THÀNH VIÊN</h2>
+                        <p class="text-sm text-slate-500 mt-1">Tra cứu hồ sơ cá nhân và quá trình hoạt động</p>
+                    </div>
+                    <div class="w-full sm:w-auto">
+                        <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm focus-within:border-emerald-500 transition-colors">
+                            <input type="text" id="member-lookup-keyword" placeholder="Mã TV / SĐT..." class="flex-1 w-full px-3 py-2 text-sm bg-transparent outline-none font-medium" onkeyup="if(event.key==='Enter') searchMemberBook()">
+                            <button onclick="searchMemberBook()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"><i class="fa-solid fa-search"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div id="member-lookup-result-msg" class="p-6 text-center text-sm hidden"></div>
+            </div>
+        </div>
+
+        <!-- GIAO DIỆN SỔ THÀNH VIÊN 2 TRANG IN -->
+        <div id="book-form-container" class="bg-[#fdfbf7] rounded-3xl p-6 md:p-10 shadow-2xl relative max-w-2xl mx-auto text-slate-800 space-y-6 mt-6 hidden border border-amber-900/10">
+            <div class="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] pointer-events-none rounded-3xl"></div>
+            <!-- TRANG 1 -->
+            <div class="print-page-1 border-[6px] border-double border-amber-900/60 rounded-2xl p-6 md:p-8 bg-white relative shadow-sm">
+                <div class="text-center font-bold text-amber-900 border-b-2 border-amber-200/60 pb-4 mb-6">
+                    <h2 class="text-base md:text-lg uppercase tracking-[0.2em] font-black">THÔNG TIN THÀNH VIÊN</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1.5 bg-amber-50 inline-block px-3 py-1 rounded-full border border-amber-100">ID: <span id="bf-id" class="font-bold text-amber-900"></span></p>
+                </div>
+                <div class="flex justify-center mb-6">
+                    <div class="w-28 h-36 border-4 border-amber-900/20 rounded-xl bg-slate-50 overflow-hidden shadow-inner flex items-center justify-center p-1">
+                        <img id="bf-photo" src="" class="w-full h-full object-cover rounded-lg hidden">
+                        <div id="bf-photo-placeholder" class="text-xs text-slate-400 text-center font-semibold"><i class="fa-solid fa-user-large text-3xl mb-2 text-slate-300"></i><br>Ảnh 3x4</div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm px-2">
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Họ và tên</span><span class="mr-2">:</span><span id="bf-fullname" class="flex-1 font-extrabold text-amber-900 text-base uppercase"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Ngày sinh</span><span class="mr-2">:</span><span id="bf-dob" class="w-32 font-semibold"></span><span class="font-bold text-slate-500">Giới tính</span><span class="mx-2">:</span><span id="bf-gender" class="flex-1 font-semibold"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Lớp</span><span class="mr-2">:</span><span id="bf-classroom" class="flex-1 font-semibold"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Đơn vị</span><span class="mr-2">:</span><span class="flex-1 font-semibold">THPT Hồng Bàng</span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Câu lạc bộ</span><span class="mr-2">:</span><span id="bf-schoolclub" class="flex-1 font-bold text-amber-800"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Chức vụ</span><span class="mr-2">:</span><span id="bf-role" class="flex-1 font-bold text-amber-800"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Ngày gia nhập</span><span class="mr-2">:</span><span id="bf-joindate" class="w-32 font-semibold"></span><span class="font-bold text-slate-500">Khóa thi</span><span class="mx-2">:</span><span id="bf-examdate" class="flex-1 font-semibold"></span></div>
+                    <div class="flex items-end border-b border-dotted border-slate-300 pb-1.5"><span class="w-32 font-bold text-slate-500">Chuyên môn</span><span class="mr-2">:</span><span id="bf-instruments" class="flex-1 font-bold text-amber-800"></span></div>
+                </div>
+                <div class="grid grid-cols-2 pt-8 text-center text-xs font-bold text-slate-600">
+                    <div><p class="uppercase mb-1 text-slate-800">THÀNH VIÊN</p><p class="text-[9px] italic font-normal text-slate-400">(Ký và ghi rõ họ tên)</p><div class="h-16 flex items-center justify-center mt-2"><img id="bf-member-sign-img" src="" class="max-h-full max-w-[100px] object-contain hidden"></div><p id="sign-fullname" class="text-amber-900 mt-2"></p></div>
+                    <div><p class="uppercase mb-1 text-slate-800">BAN CHỦ NHIỆM</p><p class="text-[9px] italic font-normal text-slate-400">(Ký và đóng dấu)</p><div class="h-16 flex items-center justify-center mt-2 relative"><img id="bf-leader-sign-img" src="" class="max-h-full max-w-[110px] object-contain hidden"></div><p class="text-amber-900 mt-2">Chủ Nhiệm CLB</p></div>
+                </div>
+            </div>
+            <!-- TRANG 2 -->
+            <div class="print-page-2 border-[6px] border-double border-amber-900/60 rounded-2xl p-6 md:p-8 bg-white relative shadow-sm">
+                <div class="text-center font-bold text-amber-900 border-b-2 border-amber-200/60 pb-4 mb-6">
+                    <h2 class="text-base md:text-lg uppercase tracking-[0.2em] font-black">QUÁ TRÌNH SINH HOẠT</h2>
+                    <p class="text-xs text-slate-500 font-mono mt-1.5 bg-amber-50 inline-block px-3 py-1 rounded-full border border-amber-100"><span id="bf-act-fullname" class="font-bold text-amber-900"></span> - ID: <span id="bf-act-id"></span></p>
+                </div>
+                <div id="bf-activities-container" class="space-y-4 max-h-[500px] overflow-y-auto hide-scrollbar"></div>
+            </div>
+            <div class="flex justify-between items-center pt-4 no-print">
+                <p class="text-xs text-amber-700/80 font-medium"><i class="fa-solid fa-print"></i> Sổ chia 2 trang A4</p>
+                <button onclick="triggerPrintMemberBook()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-xl text-sm flex items-center gap-2 transition-all shadow-md">In Toàn Bộ Sổ</button>
+            </div>
+        </div>
+
+        <!-- TAB 4: ĐĂNG KÝ LẬP SỔ MỚI -->
+        <div id="tab-register-book" class="tab-content hidden no-print max-w-3xl mx-auto">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-6 md:p-8 border-b border-slate-200 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 text-emerald-600 text-xl"><i class="fa-solid fa-address-book"></i></div>
+                    <div><h2 class="text-xl font-black text-slate-800">LẬP SỔ THÀNH VIÊN</h2><p class="text-xs text-slate-500 mt-1">Dành cho thành viên đã qua xét duyệt chính thức</p></div>
+                </div>
+                <form id="registerMemberForm" onsubmit="handleRegisterMemberBook(event)" class="p-6 md:p-8 space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-700 mb-1.5">Họ và Tên <span class="text-rose-500">*</span></label><input type="text" id="reg-m-fullname" required placeholder="Nhập họ tên đầy đủ..." class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Ngày sinh <span class="text-rose-500">*</span></label><input type="date" id="reg-m-dob" required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Giới tính <span class="text-rose-500">*</span></label><select id="reg-m-gender" required class="custom-input"><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Lớp <span class="text-rose-500">*</span></label><input type="text" id="reg-m-classroom" placeholder="10A1" required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Đơn vị Câu lạc bộ <span class="text-rose-500">*</span></label><input type="text" id="reg-m-schoolclub" value="CLB Guitar Cổ Điển" required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Chuyên môn / Nhạc cụ <span class="text-rose-500">*</span></label><input type="text" id="reg-m-instruments" placeholder="Guitar Cổ Điển, Thanh nhạc..." required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Trúng tuyển khóa <span class="text-rose-500">*</span></label><input type="date" id="reg-m-examdate" required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Số điện thoại <span class="text-rose-500">*</span></label><input type="tel" id="reg-m-phone" placeholder="SĐT liên hệ..." required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Email <span class="text-rose-500">*</span></label><input type="email" id="reg-m-email" placeholder="Email..." required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Ngày gia nhập <span class="text-rose-500">*</span></label><input type="date" id="reg-m-joindate" required class="custom-input"></div>
+                        <div><label class="block text-xs font-bold text-slate-700 mb-1.5">Tải lên ảnh 3x4 (Bắt buộc) <span class="text-rose-500">*</span></label><input type="file" id="reg-m-photo-file" accept="image/*" required onchange="previewRegisterMemberImage(event)" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300"></div>
+                    </div>
+                    <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-slate-100">
+                        <button type="button" onclick="switchTab('member-book')" class="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-colors">Hủy</button>
+                        <button type="submit" class="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-colors"><i class="fa-solid fa-check"></i> Xác Nhận Tạo Sổ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- PHIẾU IN A4 TỔNG HỢP (THÍ SINH) -->
+        <div id="print-area" class="hidden bg-white p-8 rounded-lg shadow-lg max-w-3xl mx-auto text-black leading-tight border border-slate-300">
+            <div class="text-center font-bold">
+                <p class="text-xs md:text-sm uppercase">CÂU LẠC BỘ NGHỆ THUẬT TRƯỜNG TRUNG HỌC PHỔ THÔNG HỒNG BÀNG</p>
+                <p class="text-sm md:text-base text-amber-900 uppercase">CÂU LẠC BỘ GUITAR CỔ ĐIỂN</p>
+                <h1 class="text-lg md:text-xl font-extrabold mt-2 tracking-wide">PHIẾU THÔNG TIN THÍ SINH</h1>
+                <p class="text-xs font-semibold">THAM GIA KÌ THI TUYỂN THÀNH VIÊN THƯỜNG NIÊN 2026</p>
+                <p class="text-xs text-right mt-1 italic">MÃ SỐ PHIẾU: <span id="p-card-id" class="font-mono font-bold"></span></p>
+            </div>
+            <hr class="my-3 border-black">
+            <div class="mb-4"><h2 class="font-bold text-xs md:text-sm underline mb-2">PHẦN 1: THÔNG TIN CỦA THÍ SINH</h2><div class="flex gap-4"><div class="w-24 h-32 border border-black flex items-center justify-center overflow-hidden shrink-0"><img id="p-photo" src="" class="hidden w-full h-full object-cover"><span id="p-photo-txt" class="text-xs text-center text-slate-400">Ảnh 3x4</span></div><div class="text-xs space-y-1 flex-1"><p><strong>Họ và tên:</strong> <span id="p-fullname"></span></p><p><strong>Ngày sinh:</strong> <span id="p-dob"></span> &nbsp;&nbsp;&nbsp;&nbsp; <strong>Giới tính:</strong> <span id="p-gender"></span></p><p><strong>Học sinh trường:</strong> <span id="p-school"></span> &nbsp;&nbsp;&nbsp;&nbsp; <strong>Lớp:</strong> <span id="p-classroom"></span></p><p><strong>Số điện thoại:</strong> <span id="p-phone"></span></p><p><strong>Email:</strong> <span id="p-email"></span></p><div class="mt-1"><p><strong>2 môn thi đã đăng ký:</strong></p><div id="p-subjects-list" class="grid grid-cols-2 gap-1 mt-0.5 pl-2 font-semibold"></div></div></div></div></div>
+            <div class="mb-4 border-t border-black pt-2"><h2 class="font-bold text-xs md:text-sm underline mb-2">PHẦN 2: THÔNG TIN PHÒNG THI (BAN KHẢO THÍ ĐIỀN)</h2><div class="text-xs space-y-1.5"><p><strong>SỐ BÁO DANH (SBD):</strong> <span id="p-sbd" class="font-mono font-bold text-sm"></span></p><div id="p-rooms-print-container" class="grid grid-cols-2 gap-2 mt-1"></div></div></div>
+            <div class="mb-4 border-t border-black pt-2"><h2 class="font-bold text-xs md:text-sm underline mb-2">PHẦN 3: KẾT QUẢ ĐÁNH GIÁ & ĐIỂM SỐ (BAN KHẢO THÍ ĐIỀN)</h2><div class="text-xs space-y-1.5"><div id="p-scores-print-container" class="grid grid-cols-2 gap-2 border p-2 text-center bg-slate-50"></div><div class="pt-2 space-y-1"><p><strong>Điểm Trung Bình (ĐTB):</strong> <span id="p-dtb" class="font-bold text-sm"></span></p><p id="p-conclusion-container"><strong>Kết luận:</strong> <span id="p-conclusion"></span></p><p id="p-rank-container"><strong>Xếp loại:</strong> <span id="p-rank" class="font-bold uppercase"></span></p></div><div class="pt-2 border-t border-dotted border-slate-400 mt-2"><p><strong>Lịch sử & Phản hồi phúc tra:</strong></p><div id="p-phuctra-history-print" class="mt-1 space-y-1 text-[11px] pl-2 border-l-2 border-slate-300 italic"></div></div></div></div>
+            <div class="mt-6 flex justify-center gap-4 no-print"><button onclick="triggerPrintCandidateCard()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2 text-sm"><i class="fa-solid fa-print"></i> In Phiếu Ngay</button><button onclick="closePrintCard()" class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-6 rounded-lg text-sm">Đóng Xem</button></div>
+        </div>
+
+        <!-- MODAL QUẢN TRỊ (BAN KHẢO THÍ & BCN) -->
         <div id="admin-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-3 md:p-6 z-[60] no-print transition-opacity duration-300">
             <div id="admin-modal-box" class="bg-white rounded-[2rem] max-w-6xl w-full h-[90vh] flex flex-col overflow-hidden shadow-2xl relative border border-slate-200 scale-95 transition-transform duration-300">
                 <div class="bg-slate-800 text-white p-5 flex justify-between items-center shrink-0">
@@ -163,50 +457,136 @@
                         <button onclick="switchAdminTab('candidates')" id="admin-tab-btn-candidates" class="px-5 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold transition-colors whitespace-nowrap shadow-md relative flex items-center gap-1.5"><i class="fa-solid fa-users"></i> Thí Sinh & Điểm Thi</button>
                         <button onclick="switchAdminTab('reappeals')" id="admin-tab-btn-reappeals" class="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap"><i class="fa-solid fa-scale-balanced text-amber-600"></i> Đơn Phúc Tra <span id="reappeal-badge-count" class="bg-rose-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold hidden shadow">0</span></button>
                         <button onclick="switchAdminTab('members')" id="admin-tab-btn-members" class="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1.5"><i class="fa-solid fa-address-book text-emerald-600"></i> Sổ Thành Viên</button>
-                        <!-- Tab đặc biệt chỉ Owner mới thấy -->
                         <button onclick="switchAdminTab('roles')" id="admin-tab-btn-roles" class="hidden px-5 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap"><i class="fa-solid fa-crown"></i> Phân Quyền BCN</button>
                     </div>
 
-                    <!-- Các section cũ giữ nguyên -->
                     <div id="admin-section-candidates" class="flex-1 flex flex-col space-y-4 overflow-hidden">
-                        <!-- Nội dung Tab Thí sinh... -->
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto text-xs">
+                                <div class="bg-white border border-slate-200 p-3 rounded-xl text-center shadow-sm"><span class="text-slate-400 font-bold block mb-1">Tổng TS</span><strong id="stat-total" class="text-xl text-slate-800">0</strong></div>
+                                <div class="bg-white border border-blue-200 p-3 rounded-xl text-center shadow-sm"><span class="text-blue-400 font-bold block mb-1">Lý thuyết</span><strong id="stat-ltan" class="text-xl text-blue-700">0</strong></div>
+                                <div class="bg-white border border-amber-200 p-3 rounded-xl text-center shadow-sm"><span class="text-amber-400 font-bold block mb-1">Guitar Cổ điển</span><strong id="stat-gcd" class="text-xl text-amber-700">0</strong></div>
+                                <div class="bg-white border border-purple-200 p-3 rounded-xl text-center shadow-sm"><span class="text-purple-400 font-bold block mb-1">Khác</span><strong id="stat-other" class="text-xl text-purple-700">0</strong></div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                                <button onclick="openAddCandidateModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-sm flex items-center gap-1.5"><i class="fa-solid fa-user-plus"></i> Thêm TS</button>
+                                <button onclick="exportCandidatesExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-sm flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button>
+                                <button onclick="deleteAllCandidates()" class="bg-rose-100 hover:bg-rose-200 text-rose-600 text-xs font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center gap-1.5"><i class="fa-solid fa-trash-can"></i> Xóa Hết</button>
+                            </div>
+                        </div>
+                        <div class="relative shrink-0"><i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i><input type="text" id="admin-search-input" oninput="filterAdminTable()" placeholder="Tìm kiếm nhanh thí sinh..." class="custom-input pl-10"></div>
                         <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm"><table class="w-full text-xs text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider"><tr><th class="p-4">Mã Phiếu</th><th class="p-4">Họ và Tên</th><th class="p-4">SBD</th><th class="p-4">Lớp</th><th class="p-4">2 Môn Thi</th><th class="p-4">ĐTB</th><th class="p-4">Phúc Tra</th><th class="p-4">Kết Luận</th><th class="p-4 text-center">Thao Tác</th></tr></thead><tbody id="admin-table-body" class="divide-y divide-slate-100"></tbody></table></div>
                     </div>
+
                     <div id="admin-section-reappeals" class="hidden flex-1 flex flex-col space-y-4 overflow-hidden">
-                         <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm"><table class="w-full text-xs text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider"><tr><th class="p-4">Mã Phiếu</th><th class="p-4">Họ và Tên</th><th class="p-4">Nội Dung Phúc Tra</th><th class="p-4">Trạng Thái</th><th class="p-4 text-center">Thao Tác</th></tr></thead><tbody id="admin-reappeals-table-body" class="divide-y divide-slate-100"></tbody></table></div>
+                        <div class="flex justify-between items-center shrink-0 border-b border-slate-200 pb-3"><h4 class="font-black text-slate-800 text-sm flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-amber-600"></i> ĐƠN XIN PHÚC TRA ĐIỂM</h4></div>
+                        <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm"><table class="w-full text-xs text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider"><tr><th class="p-4">Mã Phiếu</th><th class="p-4">Họ và Tên</th><th class="p-4">Nội Dung Phúc Tra</th><th class="p-4">Trạng Thái</th><th class="p-4 text-center">Thao Tác</th></tr></thead><tbody id="admin-reappeals-table-body" class="divide-y divide-slate-100"></tbody></table></div>
                     </div>
+
                     <div id="admin-section-members" class="hidden flex-1 flex flex-col space-y-4 overflow-hidden">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full md:w-auto text-xs"><div class="bg-white border border-slate-200 p-3 rounded-xl text-center shadow-sm"><span class="text-slate-400 font-bold block mb-1">Tổng TV</span><strong id="stat-m-total" class="text-xl text-slate-800">0</strong></div><div class="bg-white border border-amber-200 p-3 rounded-xl text-center shadow-sm"><span class="text-amber-400 font-bold block mb-1">BCN</span><strong id="stat-m-bcn" class="text-xl text-amber-700">0</strong></div><div class="bg-white border border-emerald-200 p-3 rounded-xl text-center shadow-sm"><span class="text-emerald-400 font-bold block mb-1">Thành viên</span><strong id="stat-m-reg" class="text-xl text-emerald-700">0</strong></div></div>
+                            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end"><button onclick="openMemberAddModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-sm flex items-center gap-1.5"><i class="fa-solid fa-plus"></i> Tạo Sổ Mới</button><button onclick="exportMembersExcel()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-colors shadow-sm flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Xuất Dữ Liệu</button></div>
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-3 shrink-0">
+                            <div class="relative flex-1"><i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i><input type="text" id="admin-member-search" oninput="filterAdminMemberTable()" placeholder="Tìm kiếm sổ thành viên..." class="custom-input pl-10"></div>
+                            <select id="admin-member-role" onchange="filterAdminMemberTable()" class="custom-input w-full md:w-48 font-semibold"><option value="">Tất cả chức vụ</option><option value="Chủ nhiệm">Chủ nhiệm</option><option value="Phó chủ nhiệm">Phó chủ nhiệm</option><option value="Thành viên">Thành viên</option><option value="Cựu thành viên">Cựu thành viên</option></select>
+                        </div>
                         <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm"><table class="w-full text-xs text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider"><tr><th class="p-4">Mã TV</th><th class="p-4">Họ và Tên</th><th class="p-4">Lớp</th><th class="p-4">Chức Vụ</th><th class="p-4">Nhạc Cụ</th><th class="p-4">SĐT</th><th class="p-4 text-center">Thao Tác</th></tr></thead><tbody id="admin-member-table-body" class="divide-y divide-slate-100"></tbody></table></div>
                     </div>
 
-                    <!-- MỚI: SECTION PHÂN QUYỀN (CHỈ OWNER) -->
                     <div id="admin-section-roles" class="hidden flex-1 flex flex-col space-y-4 overflow-hidden">
                         <div class="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center justify-between">
-                            <div>
-                                <h4 class="font-black text-rose-800 text-sm"><i class="fa-solid fa-crown"></i> QUẢN LÝ QUYỀN TRUY CẬP (DÀNH RIÊNG CHO CHỦ CLUB)</h4>
-                                <p class="text-xs text-rose-600 mt-1">Cấp quyền Quản trị viên (Admin) cho các thành viên để họ có thể duyệt hồ sơ, nhập điểm và upload ảnh/video.</p>
-                            </div>
+                            <div><h4 class="font-black text-rose-800 text-sm"><i class="fa-solid fa-crown"></i> QUẢN LÝ QUYỀN TRUY CẬP (DÀNH RIÊNG CHO CHỦ CLUB)</h4><p class="text-xs text-rose-600 mt-1">Cấp quyền Quản trị viên (Admin) cho các thành viên để họ có thể duyệt hồ sơ, nhập điểm và upload ảnh/video.</p></div>
                         </div>
-                        <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm">
-                            <table class="w-full text-sm text-left text-slate-600">
-                                <thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider">
-                                    <tr><th class="p-4">ID Tài Khoản (Supabase)</th><th class="p-4">Email</th><th class="p-4 text-center">Cấp Quyền</th></tr>
-                                </thead>
-                                <tbody id="admin-roles-table-body" class="divide-y divide-slate-100">
-                                    <!-- Nơi render danh sách user để phân quyền -->
-                                </tbody>
-                            </table>
-                        </div>
+                        <div class="flex-1 overflow-auto border border-slate-200 rounded-2xl bg-white shadow-sm"><table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-50 text-slate-500 uppercase font-bold sticky top-0 border-b border-slate-200 z-10 text-[10px] tracking-wider"><tr><th class="p-4">ID Tài Khoản</th><th class="p-4">Email</th><th class="p-4 text-center">Cấp Quyền</th></tr></thead><tbody id="admin-roles-table-body" class="divide-y divide-slate-100"></tbody></table></div>
                     </div>
 
                 </div>
             </div>
         </div>
 
-        <!-- CÁC MODAL CŨ GIỮ NGUYÊN (reappeal-respond-modal, edit-modal, member-modal) DÁN VÀO ĐÂY -->
-        
+        <!-- MODAL PHẢN HỒI PHÚC TRA -->
+        <div id="reappeal-respond-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-[70] no-print">
+            <div class="bg-white rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4"><h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-reply text-amber-500"></i> XỬ LÝ PHÚC TRA</h3><button onclick="closeReappealRespondModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="space-y-5 text-sm">
+                    <input type="hidden" id="resp-candidate-id">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2"><p class="text-xs text-slate-500">Thí sinh: <span id="resp-candidate-name" class="font-bold text-slate-800 text-sm ml-1"></span></p><p class="text-xs text-slate-500">Nội dung đơn:</p><div id="resp-candidate-content" class="p-3 bg-white rounded-xl border border-slate-200 text-slate-700 italic"></div></div>
+                    <div class="bg-amber-50/50 p-4 rounded-2xl border border-amber-200 space-y-3"><h4 class="font-bold text-amber-900 text-xs uppercase tracking-wider">Cập Nhật Điểm (Nếu có sai sót)</h4><div id="resp-scores-table-container" class="space-y-2"></div></div>
+                    <div><label class="block font-bold text-slate-700 mb-2 text-xs uppercase tracking-wider">Phản hồi lại thí sinh:</label><textarea id="resp-note-input" rows="2" placeholder="Nhập lý do hoặc lời nhắn..." class="custom-input"></textarea></div>
+                    <div class="flex flex-col-reverse sm:flex-row justify-between items-center pt-4 border-t border-slate-100 gap-3"><button type="button" onclick="rejectReappeal()" class="w-full sm:w-auto px-5 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl font-bold transition-colors">Từ Chối (Giữ nguyên)</button><div class="flex w-full sm:w-auto gap-2"><button type="button" onclick="closeReappealRespondModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-colors">Hủy</button><button type="button" onclick="acceptReappeal()" class="flex-1 sm:flex-none px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold shadow-md transition-colors">Cập Nhật Điểm</button></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL SỬA PHIẾU THÍ SINH -->
+        <div id="edit-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-[70] no-print">
+            <div class="bg-white rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto hide-scrollbar">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4"><h3 id="edit-modal-title" class="font-black text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-user-pen text-amber-500"></i> HỒ SƠ THÍ SINH</h3><button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button></div>
+                <form id="editForm" onsubmit="handleSaveEdit(event)" class="space-y-6 text-sm">
+                    <input type="hidden" id="edit-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <div class="sm:col-span-2 flex gap-4 mb-2"><input type="text" id="edit-id-display" disabled class="bg-transparent border-none font-mono font-bold text-slate-400 text-xs w-full p-0"></div>
+                        <div><label class="form-label">Họ và Tên</label><input type="text" id="edit-fullname" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Ngày sinh</label><input type="date" id="edit-dob" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Giới tính</label><select id="edit-gender" required class="custom-input py-2"><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></div>
+                        <div><label class="form-label">Lớp</label><input type="text" id="edit-classroom" required class="custom-input py-2"></div>
+                        <div><label class="form-label">SĐT</label><input type="tel" id="edit-phone" class="custom-input py-2"></div>
+                        <div><label class="form-label">Email</label><input type="email" id="edit-email" class="custom-input py-2"></div>
+                        <div class="sm:col-span-2 mt-2"><label class="form-label">Môn đăng ký</label><div class="flex flex-wrap gap-4 mt-1"><label class="flex items-center gap-1.5 opacity-50"><input type="checkbox" checked disabled class="accent-amber-600"> Lý thuyết âm nhạc</label><label class="flex items-center gap-1.5"><input type="radio" name="edit-optional-sub" value="Guitar cổ điển" class="accent-amber-600"> Guitar cổ điển</label><label class="flex items-center gap-1.5"><input type="radio" name="edit-optional-sub" value="Guitar đệm hát" class="accent-amber-600"> Guitar đệm hát</label><label class="flex items-center gap-1.5"><input type="radio" name="edit-optional-sub" value="Thanh nhạc" class="accent-amber-600"> Thanh nhạc</label></div></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50/30 p-5 rounded-2xl border border-blue-100">
+                        <div class="sm:col-span-2"><label class="form-label text-blue-800">Số Báo Danh (SBD)</label><input type="text" id="edit-sbd" class="custom-input py-2 font-mono font-bold text-blue-700 border-blue-200"></div>
+                        <div class="sm:col-span-2"><div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="edit-rooms-inputs-container"></div></div>
+                    </div>
+                    <div class="bg-emerald-50/30 p-5 rounded-2xl border border-emerald-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4" id="edit-scores-inputs-container"></div>
+                        <div><label class="form-label text-emerald-800">Nội dung Phúc tra (Ghi chú)</label><input type="text" id="edit-phuctra" class="custom-input py-2 border-emerald-200"></div>
+                    </div>
+                    <div class="bg-amber-50/30 p-5 rounded-2xl border border-amber-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label class="form-label text-amber-900">Kết luận xét tuyển</label><select id="edit-status" onchange="toggleRankVisibility()" class="custom-input py-2 font-bold text-slate-700 border-amber-200"><option value="Chưa xét">Chưa xét</option><option value="ĐỦ">ĐỦ ĐIỀU KIỆN</option><option value="KHÔNG ĐỦ">KHÔNG ĐỦ ĐIỀU KIỆN</option></select></div>
+                        <div id="edit-rank-box"><label class="form-label text-emerald-700">Xếp loại thành viên</label><select id="edit-rank" class="custom-input py-2 font-bold text-emerald-700 border-emerald-200"><option value="CHÍNH THỨC">CHÍNH THỨC</option><option value="DỰ BỊ">DỰ BỊ</option></select></div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" onclick="closeEditModal()" class="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-colors">Hủy</button>
+                        <button type="submit" class="px-8 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold shadow-md transition-colors">Lưu Dữ Liệu</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL SỬA SỔ THÀNH VIÊN -->
+        <div id="member-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-[70] no-print">
+            <div class="bg-white rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto hide-scrollbar">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4"><h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i class="fa-solid fa-address-book text-emerald-500"></i> QUẢN LÝ SỔ THÀNH VIÊN</h3><button onclick="closeMemberModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button></div>
+                <form id="memberForm" onsubmit="handleSaveMember(event)" class="space-y-6 text-sm">
+                    <input type="hidden" id="edit-member-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <div class="sm:col-span-2"><label class="form-label">Họ và Tên</label><input type="text" id="m-fullname" required class="custom-input py-2 text-base font-bold"></div>
+                        <div><label class="form-label">Ngày sinh</label><input type="date" id="m-dob" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Giới tính</label><select id="m-gender" required class="custom-input py-2"><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></div>
+                        <div><label class="form-label">Lớp</label><input type="text" id="m-classroom" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Chức vụ</label><select id="m-role" required class="custom-input py-2 font-bold text-amber-700"><option value="Thành viên">Thành viên</option><option value="Chủ nhiệm">Chủ nhiệm</option><option value="Phó chủ nhiệm">Phó chủ nhiệm</option><option value="Cựu thành viên">Cựu thành viên</option></select></div>
+                        <div><label class="form-label">Số điện thoại</label><input type="tel" id="m-phone" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Email</label><input type="email" id="m-email" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Nhạc cụ</label><input type="text" id="m-instruments" required class="custom-input py-2"></div>
+                        <div><label class="form-label">Ngày vào CLB</label><input type="date" id="m-joindate" required class="custom-input py-2"></div>
+                    </div>
+                    <div class="space-y-3 pt-2">
+                        <div class="flex justify-between items-center bg-slate-800 text-white px-4 py-3 rounded-xl"><h4 class="font-bold text-xs uppercase tracking-wider"><i class="fa-solid fa-list-check"></i> Quá trình sinh hoạt</h4><button type="button" onclick="addActivityRow()" class="bg-white/20 hover:bg-white/30 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition-colors"><i class="fa-solid fa-plus"></i> Mốc sự kiện</button></div>
+                        <div id="activities-input-list" class="space-y-3 max-h-48 overflow-y-auto p-1 hide-scrollbar"></div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" onclick="closeMemberModal()" class="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-colors">Hủy</button>
+                        <button type="submit" class="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-colors">Lưu Sổ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
+    <!-- Script Tải App -->
     <script src="app.js"></script>
 </body>
 </html>
