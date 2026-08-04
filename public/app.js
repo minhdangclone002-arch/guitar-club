@@ -1,18 +1,17 @@
+// ==========================================
 // 1. KẾT NỐI SUPABASE
+// ==========================================
 const SUPABASE_URL = 'https://wtvoatrmrakatuxyukox.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dm9hdHJtcmFrYXR1eHl1a294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4MjU3OTMsImV4cCI6MjEwMTQwMTc5M30.eYsaZBCHFmEPD7Rkr_PukOhhzLmYJsUBoNN17EMAo6U';
-
-// Khởi tạo Supabase client từ CDN
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Đường dẫn gọi API (để trống vì chạy chung 1 server Node.js)
-const API_URL = ''; 
+const API_URL = ''; // Để trống vì Backend chạy cùng thư mục
 
-// Các hằng số cũ
-const ADMIN_PASS = "admin123";
+// ==========================================
+// 2. BIẾN TOÀN CỤC & LOCAL STORAGE CŨ
+// ==========================================
 const CANDIDATE_STORAGE = "HB3_GUITAR_CANDIDATES_MERGED_V2";
 const MEMBER_STORAGE = "HB3_GUITAR_MEMBERS_MERGED";
-
 const syncChannel = new BroadcastChannel('HB3_GUITAR_SYNC_CHANNEL');
 
 let candidateList = [];
@@ -23,25 +22,86 @@ let currentRegMemberPhotoBase64 = "";
 let currentLookupCandidateId = null;
 let currentLookupMemberId = null;
 
-// ==========================================
-// TÍNH NĂNG ĐĂNG NHẬP / ĐĂNG KÝ
-// ==========================================
+// Biến lưu quyền hiện tại của người dùng đăng nhập
+let currentUserRole = 'member'; // Mặc định là thành viên
 
 window.addEventListener('DOMContentLoaded', () => {
-    checkSession();
+    checkSession(); // Kích hoạt kiểm tra đăng nhập ngay khi mở web
 });
 
+// ==========================================
+// 3. TÍNH NĂNG ĐĂNG NHẬP & PHÂN QUYỀN
+// ==========================================
 async function checkSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     
     if (session) {
         document.getElementById('auth-modal').classList.add('hidden');
-        document.getElementById('user-display-email').innerText = "Tài khoản: " + session.user.email;
-        loadInitialData();
+        document.getElementById('user-display-email').innerHTML = `<i class="fa-solid fa-circle-user mr-1"></i> ${session.user.email}`;
+        
+        // Truy vấn lấy quyền (role) từ bảng profiles trên Supabase
+        const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
+        if (profile) {
+            currentUserRole = profile.role;
+        }
+
+        applyRoleUI(); // Kích hoạt ẩn/hiện giao diện theo quyền
+        loadInitialData(); // Tải dữ liệu Candidates, Members, Media
         switchTab('home');
     } else {
         document.getElementById('auth-modal').classList.remove('hidden');
     }
+}
+
+function applyRoleUI() {
+    const isMember = currentUserRole === 'member';
+    const isAdmin = currentUserRole === 'admin';
+    const isOwner = currentUserRole === 'owner';
+
+    // Danh sách ID các chức năng mà Member KHÔNG ĐƯỢC PHÉP THẤY
+    const adminElements = [
+        'btn-admin-nav', 'btn-admin-home', 'btn-tab-member-book', 
+        'btn-tab-register-book', 'card-member-book', 'card-register-book', 
+        'upload-media-container'
+    ];
+
+    if (isMember) {
+        adminElements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+    } else {
+        // Admin và Owner thì được thấy hết
+        adminElements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('hidden');
+        });
+    }
+
+    // Badge Hiển thị chức vụ và Tab Phân quyền BCN
+    const roleBadge = document.getElementById('user-role-badge');
+    const rolesTabBtn = document.getElementById('admin-tab-btn-roles');
+
+    if (isOwner) {
+        if (rolesTabBtn) rolesTabBtn.classList.remove('hidden');
+        if (roleBadge) {
+            roleBadge.innerText = 'Chủ Club';
+            roleBadge.className = "ml-1 px-1.5 py-0.5 bg-rose-600 text-white text-[9px] rounded font-bold uppercase";
+            roleBadge.classList.remove('hidden');
+        }
+    } else if (isAdmin) {
+        if (rolesTabBtn) rolesTabBtn.classList.add('hidden');
+        if (roleBadge) {
+            roleBadge.innerText = 'Quản trị viên';
+            roleBadge.className = "ml-1 px-1.5 py-0.5 bg-amber-600 text-white text-[9px] rounded font-bold uppercase";
+            roleBadge.classList.remove('hidden');
+        }
+    } else {
+        if (rolesTabBtn) rolesTabBtn.classList.add('hidden');
+        if (roleBadge) roleBadge.classList.add('hidden');
+    }
+    
+    renderMedia(); // Chạy lại hàm này để ẩn/hiện nút xóa ảnh
 }
 
 function toggleAuthMode(mode) {
@@ -51,65 +111,51 @@ function toggleAuthMode(mode) {
     const btnRegister = document.getElementById('btn-show-register');
 
     if (mode === 'login') {
-        loginForm.classList.remove('hidden');
-        registerForm.classList.add('hidden');
-        btnLogin.className = "flex-1 py-2 rounded-lg text-sm font-bold bg-white text-slate-800 shadow-sm transition-all";
-        btnRegister.className = "flex-1 py-2 rounded-lg text-sm font-bold text-slate-500 transition-all hover:text-slate-800";
+        loginForm.classList.remove('hidden'); registerForm.classList.add('hidden');
+        btnLogin.className = "flex-1 py-2.5 rounded-lg text-sm font-bold bg-white text-amber-900 shadow transition-all";
+        btnRegister.className = "flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 transition-all hover:text-slate-800";
     } else {
-        loginForm.classList.add('hidden');
-        registerForm.classList.remove('hidden');
-        btnRegister.className = "flex-1 py-2 rounded-lg text-sm font-bold bg-white text-slate-800 shadow-sm transition-all";
-        btnLogin.className = "flex-1 py-2 rounded-lg text-sm font-bold text-slate-500 transition-all hover:text-slate-800";
+        loginForm.classList.add('hidden'); registerForm.classList.remove('hidden');
+        btnRegister.className = "flex-1 py-2.5 rounded-lg text-sm font-bold bg-white text-amber-900 shadow transition-all";
+        btnLogin.className = "flex-1 py-2.5 rounded-lg text-sm font-bold text-slate-500 transition-all hover:text-slate-800";
     }
 }
 
 async function handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
     const btn = document.getElementById('login-btn');
-    
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...`;
-    
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: pass });
-    
-    if (error) {
-        alert("Lỗi: Sai email hoặc mật khẩu!");
-        btn.innerHTML = `Đăng Nhập`;
-    } else {
-        checkSession();
-    }
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ 
+        email: document.getElementById('login-email').value, 
+        password: document.getElementById('login-password').value 
+    });
+    if (error) { alert("Lỗi: Sai email hoặc mật khẩu!"); btn.innerHTML = `Đăng Nhập`; } 
+    else { checkSession(); }
 }
 
 async function handleRegisterUser(e) {
     e.preventDefault();
     const email = document.getElementById('reg-user-email').value;
     const pass = document.getElementById('reg-user-password').value;
-    const confirmPass = document.getElementById('reg-user-confirm').value;
+    if (pass !== document.getElementById('reg-user-confirm').value) return alert("Lỗi: Hai mật khẩu không khớp!");
+    
     const btn = document.getElementById('reg-btn');
-
-    if (pass !== confirmPass) {
-        alert("Lỗi: Hai mật khẩu không khớp nhau!");
-        return;
-    }
-
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...`;
 
     const { data, error } = await supabaseClient.auth.signUp({ email: email, password: pass });
+    if (error) { alert("Lỗi đăng ký: " + error.message); btn.innerHTML = `Tạo Tài Khoản`; return; }
 
-    if (error) {
-        alert("Lỗi đăng ký: " + error.message);
-        btn.innerHTML = `Tạo Tài Khoản`;
-    } else {
-        alert("Đăng ký thành công! Hãy đăng nhập ngay.");
-        document.getElementById('register-form').reset();
-        toggleAuthMode('login');
-        btn.innerHTML = `Tạo Tài Khoản`;
-    }
+    // Tự động tạo hồ sơ mặc định là Member trong database
+    await supabaseClient.from('profiles').insert({ id: data.user.id, email: email, role: 'member' });
+
+    alert("Đăng ký thành công! Hãy đăng nhập ngay.");
+    document.getElementById('register-form').reset();
+    toggleAuthMode('login');
+    btn.innerHTML = `Tạo Tài Khoản`;
 }
 
 async function handleLogout() {
-    if (confirm("Bạn muốn đăng xuất khỏi hệ thống?")) {
+    if (confirm("Đăng xuất khỏi hệ thống?")) {
         await supabaseClient.auth.signOut();
         location.reload(); 
     }
@@ -118,24 +164,107 @@ async function handleLogout() {
 async function forgotPassword() {
     const email = prompt("Nhập Email bạn đã đăng ký để lấy lại mật khẩu:");
     if (!email) return;
-
-    const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email);
-    if (error) {
-        alert("Lỗi: " + error.message);
-    } else {
-        alert("Thành công! Một email khôi phục mật khẩu đã được gửi đến hộp thư của bạn.");
-    }
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+    if (error) alert("Lỗi: " + error.message);
+    else alert("Thành công! Một email khôi phục mật khẩu đã được gửi đến hộp thư của bạn.");
 }
 
 // ==========================================
-// THƯ VIỆN MEDIA
+// 4. QUẢN LÝ QUYỀN TRUY CẬP (CHỈ DÀNH CHO OWNER)
 // ==========================================
+async function renderRoleManagement() {
+    const tbody = document.getElementById('admin-roles-table-body');
+    tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Đang tải danh sách...</td></tr>';
+    
+    const { data: profiles, error } = await supabaseClient.from('profiles').select('*').order('role');
+    if (error) return;
+
+    tbody.innerHTML = '';
+    const { data: { user } } = await supabaseClient.auth.getUser();
+
+    profiles.forEach(p => {
+        const isMe = p.email === user.email;
+        let roleOptions = '';
+        let transferBtn = '';
+
+        if (p.role === 'owner') {
+            roleOptions = `<span class="px-3 py-1 font-bold text-rose-600 bg-rose-50 rounded-lg"><i class="fa-solid fa-crown"></i> Chủ Club</span>`;
+        } else {
+            roleOptions = `
+                <select onchange="updateRole('${p.id}', this.value)" class="custom-input py-1.5 w-auto inline-block bg-slate-50 border-slate-200 text-xs font-bold text-slate-700">
+                    <option value="member" ${p.role === 'member' ? 'selected' : ''}>Thành viên</option>
+                    <option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Quản trị viên</option>
+                </select>
+            `;
+            transferBtn = `<button onclick="transferOwnership('${p.id}', '${p.email}')" class="ml-2 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[10px] font-bold transition-colors" title="Nhượng quyền Chủ Club"><i class="fa-solid fa-crown"></i> Nhượng Quyền</button>`;
+        }
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="p-4 font-mono text-slate-400 text-[10px]">${p.id} ${isMe ? '(Bạn)' : ''}</td>
+                <td class="p-4 font-bold text-slate-700">${p.email}</td>
+                <td class="p-4 text-center">${roleOptions} ${transferBtn}</td>
+            </tr>
+        `;
+    });
+}
+
+async function updateRole(userId, newRole) {
+    if(confirm(`Xác nhận cấp quyền ${newRole} cho người này?`)) {
+        await supabaseClient.from('profiles').update({ role: newRole }).eq('id', userId);
+        renderRoleManagement();
+    } else {
+        renderRoleManagement();
+    }
+}
+
+async function transferOwnership(targetUserId, targetEmail) {
+    if(confirm(`CẢNH BÁO!\nBạn có chắc chắn muốn nhượng quyền CHỦ CLUB cho ${targetEmail}?\nBạn sẽ bị giáng cấp xuống thành Quản trị viên (Admin).`)) {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        await supabaseClient.from('profiles').update({ role: 'owner' }).eq('id', targetUserId);
+        await supabaseClient.from('profiles').update({ role: 'admin' }).eq('id', user.id);
+        alert("Đã nhượng quyền thành công. Bạn hiện tại là Quản trị viên.");
+        location.reload(); 
+    }
+}
+
+
+// ==========================================
+// 5. GIAO DIỆN & THƯ VIỆN MEDIA
+// ==========================================
+function switchTab(tabName) {
+    ['tab-home', 'tab-register', 'tab-lookup', 'tab-member-book', 'tab-register-book', 'tab-gallery'].forEach(t => { 
+        const el = document.getElementById(t); 
+        if(el) el.classList.add('hidden'); 
+    });
+    
+    ['home', 'register', 'lookup', 'member-book', 'register-book', 'gallery'].forEach(t => { 
+        const btn = document.getElementById(`btn-tab-${t}`); 
+        if (btn) btn.classList.remove('active'); 
+    });
+    
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if(targetTab) {
+        targetTab.classList.remove('hidden');
+        targetTab.classList.remove('tab-content');
+        void targetTab.offsetWidth; // Refresh animation
+        targetTab.classList.add('tab-content');
+    }
+    
+    const activeBtn = document.getElementById(`btn-tab-${tabName}`);
+    if(activeBtn) activeBtn.classList.add('active');
+    
+    document.getElementById('book-form-container').classList.add('hidden');
+    document.getElementById('print-area').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 async function loadMedia() {
     try {
         const res = await fetch(`${API_URL}/api/media`);
         mediaList = await res.json();
         renderMedia();
-    } catch (err) { console.log("Lỗi tải media", err); }
+    } catch (err) {}
 }
 
 async function handleMediaUpload(event) {
@@ -181,15 +310,21 @@ function renderMedia() {
     mediaList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'media-item group';
+        
+        // CHỈ ADMIN VÀ OWNER MỚI THẤY NÚT XÓA ẢNH
+        const deleteBtnHtml = (currentUserRole === 'admin' || currentUserRole === 'owner') 
+            ? `<button onclick="deleteMedia('${item.id}')" class="delete-media-btn"><i class="fa-solid fa-trash text-sm"></i></button>`
+            : '';
+
         if (item.type === 'video') {
             div.innerHTML = `
                 <video src="${item.url}" class="w-full h-full object-cover" controls preload="metadata"></video>
                 <div class="absolute top-3 left-3 bg-black/60 text-white text-[10px] uppercase font-bold px-2 py-1 rounded backdrop-blur"><i class="fa-solid fa-play"></i> VIDEO</div>
-                <button onclick="deleteMedia('${item.id}')" class="delete-media-btn"><i class="fa-solid fa-trash text-sm"></i></button>`;
+                ${deleteBtnHtml}`;
         } else {
             div.innerHTML = `
                 <img src="${item.url}" onclick="viewMediaFull('${item.url}')" class="cursor-pointer">
-                <button onclick="deleteMedia('${item.id}')" class="delete-media-btn"><i class="fa-solid fa-trash text-sm"></i></button>`;
+                ${deleteBtnHtml}`;
         }
         container.appendChild(div);
     });
@@ -209,29 +344,23 @@ function viewMediaFull(src) {
 }
 
 // ==========================================
-// TÍNH NĂNG QUẢN LÝ DỮ LIỆU CLB
+// 6. QUẢN LÝ DỮ LIỆU CLB (GIỮ NGUYÊN GỐC)
 // ==========================================
 
 syncChannel.onmessage = (event) => {
     if (event.data && event.data.type === 'DATA_UPDATED') {
-        loadInitialData();
-        updateReappealBadges();
+        loadInitialData(); updateReappealBadges();
         if (!document.getElementById('admin-modal').classList.contains('hidden')) {
-            renderAdminCandidates();
-            renderAdminReappeals();
-            renderAdminMembers();
+            renderAdminCandidates(); renderAdminReappeals(); renderAdminMembers();
         }
     }
 };
 
 window.addEventListener('storage', (e) => {
     if (e.key === CANDIDATE_STORAGE || e.key === MEMBER_STORAGE) {
-        loadInitialData();
-        updateReappealBadges();
+        loadInitialData(); updateReappealBadges();
         if (!document.getElementById('admin-modal').classList.contains('hidden')) {
-            renderAdminCandidates();
-            renderAdminReappeals();
-            renderAdminMembers();
+            renderAdminCandidates(); renderAdminReappeals(); renderAdminMembers();
         }
     }
 });
@@ -270,35 +399,14 @@ function saveMembers(broadcast = true) {
 
 function updateReappealBadges() {
     const pendingCount = candidateList.filter(c => c.phuctraStatus === 'Đang chờ').length;
-    const badgeNav = document.getElementById('nav-badge-count'); const badgeBtn = document.getElementById('btn-badge-count'); const badgeReappeal = document.getElementById('reappeal-badge-count');
+    const badgeNav = document.getElementById('nav-badge-count'); const badgeReappeal = document.getElementById('reappeal-badge-count');
     if (pendingCount > 0) {
         if (badgeNav) { badgeNav.innerText = pendingCount; badgeNav.classList.remove('hidden'); }
-        if (badgeBtn) { badgeBtn.innerText = `${pendingCount} đơn mới`; badgeBtn.classList.remove('hidden'); }
         if (badgeReappeal) { badgeReappeal.innerText = pendingCount; badgeReappeal.classList.remove('hidden'); }
     } else {
         if (badgeNav) badgeNav.classList.add('hidden');
-        if (badgeBtn) badgeBtn.classList.add('hidden');
         if (badgeReappeal) badgeReappeal.classList.add('hidden');
     }
-}
-
-function switchTab(tabName) {
-    ['tab-home', 'tab-register', 'tab-lookup', 'tab-member-book', 'tab-register-book', 'tab-gallery'].forEach(t => { const el = document.getElementById(t); if(el) el.classList.add('hidden'); });
-    ['home', 'register', 'lookup', 'member-book', 'register-book', 'gallery'].forEach(t => { 
-        const btn = document.getElementById(`btn-tab-${t}`); 
-        if (btn) { btn.classList.remove('bg-slate-100', 'text-slate-900', 'active'); btn.classList.add('text-slate-600'); }
-    });
-    const tTab = document.getElementById(`tab-${tabName}`); 
-    if(tTab) {
-        tTab.classList.remove('hidden');
-        tTab.classList.remove('tab-content');
-        void tTab.offsetWidth;
-        tTab.classList.add('tab-content');
-    }
-    const tBtn = document.getElementById(`btn-tab-${tabName}`); if(tBtn) { tBtn.classList.remove('text-slate-600'); tBtn.classList.add('bg-slate-100', 'text-slate-900', 'active'); }
-    document.getElementById('book-form-container').classList.add('hidden');
-    document.getElementById('print-area').classList.add('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function previewImage(event) {
@@ -454,27 +562,48 @@ function searchMemberBook() {
 function triggerPrintMemberBook() { document.body.classList.add('print-member-mode'); window.print(); document.body.classList.remove('print-member-mode'); }
 
 // --- KHU VỰC QUẢN TRỊ ---
-function openAdminModal() { document.getElementById('admin-modal').classList.remove('hidden'); document.getElementById('admin-modal').classList.add('flex'); document.getElementById('admin-login-view').classList.remove('hidden'); document.getElementById('admin-dashboard-view').classList.add('hidden'); document.getElementById('admin-password').value = ''; document.getElementById('login-error').classList.add('hidden'); }
-function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); document.getElementById('admin-modal').classList.remove('flex'); }
+function openAdminModal() { 
+    const modal = document.getElementById('admin-modal');
+    modal.classList.remove('hidden'); 
+    modal.classList.add('flex');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        const box = document.getElementById('admin-modal-box');
+        if(box) box.classList.remove('scale-95');
+        switchAdminTab('candidates');
+    }, 10);
+}
 
-function verifyPassword() {
-    const pass = document.getElementById('admin-password').value;
-    if (pass === ADMIN_PASS) { document.getElementById('admin-login-view').classList.add('hidden'); document.getElementById('admin-dashboard-view').classList.remove('hidden'); document.getElementById('admin-dashboard-view').classList.add('flex'); loadInitialData(); switchAdminTab('candidates'); } 
-    else { document.getElementById('login-error').classList.remove('hidden'); }
+function closeAdminModal() { 
+    const modal = document.getElementById('admin-modal');
+    modal.classList.add('opacity-0');
+    const box = document.getElementById('admin-modal-box');
+    if(box) box.classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden'); 
+        modal.classList.remove('flex'); 
+    }, 300);
 }
 
 function switchAdminTab(subTab) {
-    ['admin-section-candidates', 'admin-section-reappeals', 'admin-section-members'].forEach(id => document.getElementById(id).classList.add('hidden'));
-    ['admin-tab-btn-candidates', 'admin-tab-btn-reappeals', 'admin-tab-btn-members'].forEach(id => {
+    ['admin-section-candidates', 'admin-section-reappeals', 'admin-section-members', 'admin-section-roles'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+    ['admin-tab-btn-candidates', 'admin-tab-btn-reappeals', 'admin-tab-btn-members', 'admin-tab-btn-roles'].forEach(id => {
         const btn = document.getElementById(id);
-        btn.className = "px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap";
+        if(btn) btn.className = btn.id.includes('roles') ? "px-5 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap" : "px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap";
     });
-    document.getElementById(`admin-section-${subTab}`).classList.remove('hidden');
+    
+    const sec = document.getElementById(`admin-section-${subTab}`);
+    if(sec) sec.classList.remove('hidden');
+    
     const activeBtn = document.getElementById(`admin-tab-btn-${subTab}`);
-    activeBtn.className = "px-5 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap shadow-md";
+    if(activeBtn) {
+        activeBtn.className = subTab === 'roles' ? "px-5 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md" : "px-5 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap shadow-md";
+    }
+
     if(subTab === 'candidates') renderAdminCandidates();
     else if(subTab === 'reappeals') renderAdminReappeals();
     else if(subTab === 'members') renderAdminMembers();
+    else if(subTab === 'roles') renderRoleManagement();
 }
 
 function renderAdminCandidates() {
