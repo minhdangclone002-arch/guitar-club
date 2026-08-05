@@ -528,7 +528,18 @@
                     <input type="hidden" id="edit-id">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
                         <div class="sm:col-span-2 flex gap-4 mb-2"><input type="text" id="edit-id-display" disabled class="bg-transparent border-none font-mono font-bold text-slate-400 text-xs w-full p-0"></div>
-                        <div><label class="form-label">Họ và Tên</label><input type="text" id="edit-fullname" required class="custom-input py-2"></div>
+                        <div class="sm:col-span-2 flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
+                            <div class="w-16 h-20 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                                <img id="edit-avatar-preview" src="" class="hidden w-full h-full object-cover">
+                                <i id="edit-avatar-placeholder-icon" class="fa-solid fa-user text-slate-300 text-2xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <label class="form-label mb-1">Ảnh 3x4</label>
+                                <input type="file" id="edit-photo" accept="image/*" onchange="previewEditImage(event)" class="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300">
+                            </div>
+                        </div>
+                        <div class="sm:col-span-2"><label class="form-label">Họ và Tên</label><input type="text" id="edit-fullname" required class="custom-input py-2"></div>
+                        <div class="sm:col-span-2"><label class="form-label">Trường</label><input type="text" id="edit-school" class="custom-input py-2"></div>
                         <div><label class="form-label">Ngày sinh</label><input type="date" id="edit-dob" required class="custom-input py-2"></div>
                         <div><label class="form-label">Giới tính</label><select id="edit-gender" required class="custom-input py-2"><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></div>
                         <div><label class="form-label">Lớp</label><input type="text" id="edit-classroom" required class="custom-input py-2"></div>
