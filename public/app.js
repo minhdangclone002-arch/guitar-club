@@ -793,15 +793,21 @@ function renderAdminReappeals() {
 }
 
 function openReappealRespondModal(id) {
-    const c = candidateList.find(item => item.id === id); if (!c) return;
-    document.getElementById('resp-candidate-id').value = c.id; document.getElementById('resp-candidate-name').innerText = c.fullname; document.getElementById('resp-candidate-id-text').innerText = c.id;
-    let latestHistory = (c.phuctraHistory || []).slice(-1)[0]; document.getElementById('resp-candidate-content').innerText = latestHistory ? latestHistory.content : c.phuctra;
-    const container = document.getElementById('resp-scores-table-container'); container.innerHTML = '';
-    (c.subjects || []).forEach(sub => {
-        const div = document.createElement('div'); div.className = "flex justify-between items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl";
-        div.innerHTML = `<span class="font-bold text-slate-700 text-sm">${sub}</span><input type="number" step="0.1" min="0" max="10" id="resp-score-${sub}" value="${escapeHtml(c.scores && c.scores[sub] !== undefined ? c.scores[sub] : '')}" placeholder="Nhập điểm..." class="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white text-right">`; container.appendChild(div);
-    });
-    document.getElementById('resp-note-input').value = ''; document.getElementById('reappeal-respond-modal').classList.remove('hidden'); document.getElementById('reappeal-respond-modal').classList.add('flex');
+    try {
+        const c = candidateList.find(item => item.id === id);
+        if (!c) { alert('Không tìm thấy hồ sơ thí sinh (ID: ' + id + '). Hãy đóng khu Quản Trị và mở lại rồi thử tiếp.'); return; }
+        document.getElementById('resp-candidate-id').value = c.id; document.getElementById('resp-candidate-name').innerText = c.fullname; document.getElementById('resp-candidate-id-text').innerText = c.id;
+        let latestHistory = (c.phuctraHistory || []).slice(-1)[0]; document.getElementById('resp-candidate-content').innerText = latestHistory ? latestHistory.content : c.phuctra;
+        const container = document.getElementById('resp-scores-table-container'); container.innerHTML = '';
+        (c.subjects || []).forEach(sub => {
+            const div = document.createElement('div'); div.className = "flex justify-between items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl";
+            div.innerHTML = `<span class="font-bold text-slate-700 text-sm">${sub}</span><input type="number" step="0.1" min="0" max="10" id="resp-score-${sub}" value="${escapeHtml(c.scores && c.scores[sub] !== undefined ? c.scores[sub] : '')}" placeholder="Nhập điểm..." class="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white text-right">`; container.appendChild(div);
+        });
+        document.getElementById('resp-note-input').value = ''; document.getElementById('reappeal-respond-modal').classList.remove('hidden'); document.getElementById('reappeal-respond-modal').classList.add('flex');
+    } catch (err) {
+        console.error('Lỗi mở modal phúc tra:', err);
+        alert('Lỗi khi mở phiếu xử lý phúc tra: ' + err.message);
+    }
 }
 
 function closeReappealRespondModal() { document.getElementById('reappeal-respond-modal').classList.add('hidden'); document.getElementById('reappeal-respond-modal').classList.remove('flex'); }
