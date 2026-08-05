@@ -796,7 +796,7 @@ function openReappealRespondModal(id) {
     try {
         const c = candidateList.find(item => item.id === id);
         if (!c) { alert('Không tìm thấy hồ sơ thí sinh (ID: ' + id + '). Hãy đóng khu Quản Trị và mở lại rồi thử tiếp.'); return; }
-        document.getElementById('resp-candidate-id').value = c.id; document.getElementById('resp-candidate-name').innerText = c.fullname; document.getElementById('resp-candidate-id-text').innerText = c.id;
+        document.getElementById('resp-candidate-id').value = c.id; document.getElementById('resp-candidate-name').innerText = c.fullname;
         let latestHistory = (c.phuctraHistory || []).slice(-1)[0]; document.getElementById('resp-candidate-content').innerText = latestHistory ? latestHistory.content : c.phuctra;
         const container = document.getElementById('resp-scores-table-container'); container.innerHTML = '';
         (c.subjects || []).forEach(sub => {
