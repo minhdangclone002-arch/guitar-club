@@ -15,6 +15,7 @@ let memberList = [];
 let mediaList = [];
 let currentPhotoBase64 = "";
 let currentRegMemberPhotoBase64 = "";
+let currentEditPhotoBase64 = "";
 let currentLookupCandidateId = null;
 let currentLookupMemberId = null;
 
@@ -460,6 +461,20 @@ function previewRegisterMemberImage(event) {
     if (file) { const reader = new FileReader(); reader.onload = function(e) { currentRegMemberPhotoBase64 = e.target.result; }; reader.readAsDataURL(file); }
 }
 
+function previewEditImage(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentEditPhotoBase64 = e.target.result;
+            document.getElementById('edit-avatar-preview').src = currentEditPhotoBase64;
+            document.getElementById('edit-avatar-preview').classList.remove('hidden');
+            document.getElementById('edit-avatar-placeholder-icon').classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
 function toggleSubmitBtn() {
     const isChecked = document.getElementById('commitment-check').checked; const btn = document.getElementById('submitBtn');
     if (isChecked) { btn.disabled = false; btn.className = "w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"; }
@@ -832,7 +847,12 @@ async function openAddCandidateModal() {
 
 function openEditModal(id) {
     const c = candidateList.find(item => item.id === id); if (!c) return;
-    document.getElementById('edit-id').value = c.id; document.getElementById('edit-id-display').value = c.id; document.getElementById('edit-fullname').value = c.fullname; document.getElementById('edit-dob').value = c.dob; document.getElementById('edit-gender').value = c.gender; document.getElementById('edit-classroom').value = c.classroom; document.getElementById('edit-phone').value = c.phone; document.getElementById('edit-email').value = c.email; document.getElementById('edit-sbd').value = c.sbd || ''; document.getElementById('edit-phuctra').value = c.phuctra || 'Không'; document.getElementById('edit-status').value = c.status || 'Chưa xét'; document.getElementById('edit-rank').value = c.rank || 'CHÍNH THỨC';
+    document.getElementById('edit-id').value = c.id; document.getElementById('edit-id-display').value = c.id; document.getElementById('edit-fullname').value = c.fullname; document.getElementById('edit-school').value = c.school || ''; document.getElementById('edit-dob').value = c.dob; document.getElementById('edit-gender').value = c.gender; document.getElementById('edit-classroom').value = c.classroom; document.getElementById('edit-phone').value = c.phone; document.getElementById('edit-email').value = c.email; document.getElementById('edit-sbd').value = c.sbd || ''; document.getElementById('edit-phuctra').value = c.phuctra || 'Không'; document.getElementById('edit-status').value = c.status || 'Chưa xét'; document.getElementById('edit-rank').value = c.rank || 'CHÍNH THỨC';
+    currentEditPhotoBase64 = c.photo || '';
+    document.getElementById('edit-photo').value = '';
+    const editAvatarImg = document.getElementById('edit-avatar-preview'); const editAvatarIcon = document.getElementById('edit-avatar-placeholder-icon');
+    if (c.photo) { editAvatarImg.src = c.photo; editAvatarImg.classList.remove('hidden'); editAvatarIcon.classList.add('hidden'); }
+    else { editAvatarImg.src = ''; editAvatarImg.classList.add('hidden'); editAvatarIcon.classList.remove('hidden'); }
     const subs = c.subjects || ["Lý thuyết âm nhạc", "Guitar cổ điển"]; const optSub = subs.find(s => s !== "Lý thuyết âm nhạc") || "Guitar cổ điển";
     document.querySelectorAll('input[name="edit-optional-sub"]').forEach(radio => { if (radio.value === optSub) radio.checked = true; });
     const roomsContainer = document.getElementById('edit-rooms-inputs-container'); roomsContainer.innerHTML = '';
@@ -856,11 +876,12 @@ async function handleSaveEdit(e) {
     const newDtb = calculateDTB(newScores, newSubs);
 
     const updatedRow = {
-        fullname: document.getElementById('edit-fullname').value.trim(), dob: document.getElementById('edit-dob').value,
+        fullname: document.getElementById('edit-fullname').value.trim(), school: document.getElementById('edit-school').value.trim(), dob: document.getElementById('edit-dob').value,
         gender: document.getElementById('edit-gender').value, classroom: document.getElementById('edit-classroom').value.trim(),
         phone: document.getElementById('edit-phone').value.trim(), email: document.getElementById('edit-email').value.trim(),
         sbd: document.getElementById('edit-sbd').value.trim(), phuctra: document.getElementById('edit-phuctra').value.trim(),
-        status: document.getElementById('edit-status').value, rank: document.getElementById('edit-rank').value, dtb: newDtb
+        status: document.getElementById('edit-status').value, rank: document.getElementById('edit-rank').value, dtb: newDtb,
+        photo: currentEditPhotoBase64
     };
 
     try {
