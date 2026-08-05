@@ -8,12 +8,8 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const API_URL = ''; // Để trống vì Backend chạy cùng thư mục
 
 // ==========================================
-// 2. BIẾN TOÀN CỤC & LOCAL STORAGE CŨ
+// 2. BIẾN TOÀN CỤC
 // ==========================================
-const CANDIDATE_STORAGE = "HB3_GUITAR_CANDIDATES_MERGED_V2";
-const MEMBER_STORAGE = "HB3_GUITAR_MEMBERS_MERGED";
-const syncChannel = new BroadcastChannel('HB3_GUITAR_SYNC_CHANNEL');
-
 let candidateList = [];
 let memberList = [];
 let mediaList = [];
@@ -22,11 +18,12 @@ let currentRegMemberPhotoBase64 = "";
 let currentLookupCandidateId = null;
 let currentLookupMemberId = null;
 
-// Biến lưu quyền hiện tại của người dùng đăng nhập
 let currentUserRole = 'member'; // Mặc định là thành viên
+let realtimeChannel = null; // Kênh đồng bộ Supabase Realtime
+let realtimeReloadTimer = null;
 
 window.addEventListener('DOMContentLoaded', () => {
-    checkSession(); // Kích hoạt kiểm tra đăng nhập ngay khi mở web
+    checkSession();
 });
 
 // ==========================================
@@ -34,19 +31,19 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 async function checkSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    
+
     if (session) {
         document.getElementById('auth-modal').classList.add('hidden');
         document.getElementById('user-display-email').innerHTML = `<i class="fa-solid fa-circle-user mr-1"></i> ${session.user.email}`;
-        
-        // Truy vấn lấy quyền (role) từ bảng profiles trên Supabase
+
         const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
         if (profile) {
             currentUserRole = profile.role;
         }
 
-        applyRoleUI(); // Kích hoạt ẩn/hiện giao diện theo quyền
-        loadInitialData(); // Tải dữ liệu Candidates, Members, Media
+        applyRoleUI();
+        await loadInitialData();
+        setupRealtimeSync();
         switchTab('home');
     } else {
         document.getElementById('auth-modal').classList.remove('hidden');
@@ -58,10 +55,9 @@ function applyRoleUI() {
     const isAdmin = currentUserRole === 'admin';
     const isOwner = currentUserRole === 'owner';
 
-    // Danh sách ID các chức năng mà Member KHÔNG ĐƯỢC PHÉP THẤY
     const adminElements = [
-        'btn-admin-nav', 'btn-admin-home', 'btn-tab-member-book', 
-        'btn-tab-register-book', 'card-member-book', 'card-register-book', 
+        'btn-admin-nav', 'btn-admin-home', 'btn-tab-member-book',
+        'btn-tab-register-book', 'card-member-book', 'card-register-book',
         'upload-media-container'
     ];
 
@@ -71,14 +67,12 @@ function applyRoleUI() {
             if (el) el.classList.add('hidden');
         });
     } else {
-        // Admin và Owner thì được thấy hết
         adminElements.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.remove('hidden');
         });
     }
 
-    // Badge Hiển thị chức vụ và Tab Phân quyền BCN
     const roleBadge = document.getElementById('user-role-badge');
     const rolesTabBtn = document.getElementById('admin-tab-btn-roles');
 
@@ -100,8 +94,8 @@ function applyRoleUI() {
         if (rolesTabBtn) rolesTabBtn.classList.add('hidden');
         if (roleBadge) roleBadge.classList.add('hidden');
     }
-    
-    renderMedia(); // Chạy lại hàm này để ẩn/hiện nút xóa ảnh
+
+    renderMedia();
 }
 
 function toggleAuthMode(mode) {
@@ -125,11 +119,11 @@ async function handleLogin(e) {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...`;
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ 
-        email: document.getElementById('login-email').value, 
-        password: document.getElementById('login-password').value 
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value
     });
-    if (error) { alert("Lỗi: Sai email hoặc mật khẩu!"); btn.innerHTML = `Đăng Nhập`; } 
+    if (error) { alert("Lỗi: Sai email hoặc mật khẩu!"); btn.innerHTML = `Đăng Nhập`; }
     else { checkSession(); }
 }
 
@@ -138,14 +132,13 @@ async function handleRegisterUser(e) {
     const email = document.getElementById('reg-user-email').value;
     const pass = document.getElementById('reg-user-password').value;
     if (pass !== document.getElementById('reg-user-confirm').value) return alert("Lỗi: Hai mật khẩu không khớp!");
-    
+
     const btn = document.getElementById('reg-btn');
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...`;
 
     const { data, error } = await supabaseClient.auth.signUp({ email: email, password: pass });
     if (error) { alert("Lỗi đăng ký: " + error.message); btn.innerHTML = `Tạo Tài Khoản`; return; }
 
-    // Tự động tạo hồ sơ mặc định là Member trong database
     await supabaseClient.from('profiles').insert({ id: data.user.id, email: email, role: 'member' });
 
     alert("Đăng ký thành công! Hãy đăng nhập ngay.");
@@ -156,8 +149,9 @@ async function handleRegisterUser(e) {
 
 async function handleLogout() {
     if (confirm("Đăng xuất khỏi hệ thống?")) {
+        if (realtimeChannel) { supabaseClient.removeChannel(realtimeChannel); realtimeChannel = null; }
         await supabaseClient.auth.signOut();
-        location.reload(); 
+        location.reload();
     }
 }
 
@@ -175,7 +169,7 @@ async function forgotPassword() {
 async function renderRoleManagement() {
     const tbody = document.getElementById('admin-roles-table-body');
     tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Đang tải danh sách...</td></tr>';
-    
+
     const { data: profiles, error } = await supabaseClient.from('profiles').select('*').order('role');
     if (error) return;
 
@@ -224,36 +218,35 @@ async function transferOwnership(targetUserId, targetEmail) {
         await supabaseClient.from('profiles').update({ role: 'owner' }).eq('id', targetUserId);
         await supabaseClient.from('profiles').update({ role: 'admin' }).eq('id', user.id);
         alert("Đã nhượng quyền thành công. Bạn hiện tại là Quản trị viên.");
-        location.reload(); 
+        location.reload();
     }
 }
-
 
 // ==========================================
 // 5. GIAO DIỆN & THƯ VIỆN MEDIA
 // ==========================================
 function switchTab(tabName) {
-    ['tab-home', 'tab-register', 'tab-lookup', 'tab-member-book', 'tab-register-book', 'tab-gallery'].forEach(t => { 
-        const el = document.getElementById(t); 
-        if(el) el.classList.add('hidden'); 
+    ['tab-home', 'tab-register', 'tab-lookup', 'tab-member-book', 'tab-register-book', 'tab-gallery'].forEach(t => {
+        const el = document.getElementById(t);
+        if(el) el.classList.add('hidden');
     });
-    
-    ['home', 'register', 'lookup', 'member-book', 'register-book', 'gallery'].forEach(t => { 
-        const btn = document.getElementById(`btn-tab-${t}`); 
-        if (btn) btn.classList.remove('active'); 
+
+    ['home', 'register', 'lookup', 'member-book', 'register-book', 'gallery'].forEach(t => {
+        const btn = document.getElementById(`btn-tab-${t}`);
+        if (btn) btn.classList.remove('active');
     });
-    
+
     const targetTab = document.getElementById(`tab-${tabName}`);
     if(targetTab) {
         targetTab.classList.remove('hidden');
         targetTab.classList.remove('tab-content');
-        void targetTab.offsetWidth; // Refresh animation
+        void targetTab.offsetWidth;
         targetTab.classList.add('tab-content');
     }
-    
+
     const activeBtn = document.getElementById(`btn-tab-${tabName}`);
     if(activeBtn) activeBtn.classList.add('active');
-    
+
     document.getElementById('book-form-container').classList.add('hidden');
     document.getElementById('print-area').classList.add('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -297,7 +290,7 @@ function renderMedia() {
     const container = document.getElementById('media-gallery-container');
     if (!container) return;
     container.innerHTML = '';
-    
+
     if (mediaList.length === 0) {
         container.innerHTML = `
             <div class="col-span-full text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-300">
@@ -310,9 +303,8 @@ function renderMedia() {
     mediaList.forEach(item => {
         const div = document.createElement('div');
         div.className = 'media-item group';
-        
-        // CHỈ ADMIN VÀ OWNER MỚI THẤY NÚT XÓA ẢNH
-        const deleteBtnHtml = (currentUserRole === 'admin' || currentUserRole === 'owner') 
+
+        const deleteBtnHtml = (currentUserRole === 'admin' || currentUserRole === 'owner')
             ? `<button onclick="deleteMedia('${item.id}')" class="delete-media-btn"><i class="fa-solid fa-trash text-sm"></i></button>`
             : '';
 
@@ -344,57 +336,100 @@ function viewMediaFull(src) {
 }
 
 // ==========================================
-// 6. QUẢN LÝ DỮ LIỆU CLB (GIỮ NGUYÊN GỐC)
+// 6. DỮ LIỆU CLB — GIỜ LƯU TRÊN SUPABASE (KHÔNG DÙNG localStorage NỮA)
 // ==========================================
 
-syncChannel.onmessage = (event) => {
-    if (event.data && event.data.type === 'DATA_UPDATED') {
-        loadInitialData(); updateReappealBadges();
-        if (!document.getElementById('admin-modal').classList.contains('hidden')) {
-            renderAdminCandidates(); renderAdminReappeals(); renderAdminMembers();
-        }
-    }
-};
-
-window.addEventListener('storage', (e) => {
-    if (e.key === CANDIDATE_STORAGE || e.key === MEMBER_STORAGE) {
-        loadInitialData(); updateReappealBadges();
-        if (!document.getElementById('admin-modal').classList.contains('hidden')) {
-            renderAdminCandidates(); renderAdminReappeals(); renderAdminMembers();
-        }
-    }
-});
-
-function loadInitialData() {
+// Tải toàn bộ thí sinh + thành viên từ Supabase và dựng lại đúng cấu trúc
+// cũ (subjects/rooms/scores/phuctraHistory/activities) để không phải sửa
+// các hàm render/in phiếu phía dưới.
+async function loadInitialData() {
     loadMedia();
     try {
-        const cData = localStorage.getItem(CANDIDATE_STORAGE);
-        if (cData) { candidateList = JSON.parse(cData); } 
-        else {
-            candidateList = [{ id: "HB202601", fullname: "Nguyễn Hoàng Nam", dob: "2008-05-12", gender: "Nam", school: "THPT Hồng Bàng", classroom: "11A1", phone: "0901234567", email: "namhn@gmail.com", photo: "", subjects: ["Lý thuyết âm nhạc", "Guitar cổ điển"], sbd: "CGC-101", rooms: { "Lý thuyết âm nhạc": "P.101", "Guitar cổ điển": "P.102" }, scores: { "Lý thuyết âm nhạc": "9.5", "Guitar cổ điển": "9.0" }, dtb: "9.25", phuctra: "Không", phuctraStatus: "Chưa phúc tra", phuctraHistory: [], status: "ĐỦ", rank: "CHÍNH THỨC" }];
-            saveCandidates(false);
-        }
+        const { data: candidatesRaw, error: cErr } = await supabaseClient
+            .from('candidates').select('*').order('created_at', { ascending: false });
+        if (cErr) throw cErr;
 
-        const mData = localStorage.getItem(MEMBER_STORAGE);
-        if (mData) { memberList = JSON.parse(mData); } 
-        else {
-            memberList = [{ id: "HB202401", fullname: "Nguyễn Hoàng Nam", dob: "2008-05-12", gender: "Nam", classroom: "11A1", schoolclub: "CLB Guitar Cổ Điển", role: "Chủ nhiệm", phone: "0901234567", email: "namhn@gmail.com", instruments: "Guitar Cổ Điển, Fingerstyle", joindate: "2024-09-05", examdate: "2024-08-20", photo: "", activities: [{ date: "2024-09-05", content: "Chính thức gia nhập CLB Guitar Hồng Bàng." }, { date: "2024-11-20", content: "Tham gia biểu diễn văn nghệ chào mừng Ngày Nhà giáo VN." }] }];
-            saveMembers(false);
-        }
-    } catch (err) {}
+        const { data: subjectsRaw } = await supabaseClient
+            .from('candidate_subjects').select('*').order('id', { ascending: true });
+
+        const { data: reappealsRaw } = await supabaseClient
+            .from('candidate_reappeals').select('*').order('created_at', { ascending: true });
+
+        candidateList = (candidatesRaw || []).map(c => {
+            const subs = (subjectsRaw || []).filter(s => s.candidate_id === c.id);
+            const rooms = {}; const scores = {};
+            subs.forEach(s => { rooms[s.subject_name] = s.room || ''; scores[s.subject_name] = s.score || ''; });
+            const history = (reappealsRaw || []).filter(r => r.candidate_id === c.id).map(r => ({
+                date: r.date,
+                subjects: (r.subjects || '').split(',').map(x => x.trim()).filter(Boolean),
+                content: r.content, status: r.status, response: r.response, _dbId: r.id
+            }));
+            return {
+                id: c.id, fullname: c.fullname, dob: c.dob, gender: c.gender, school: c.school,
+                classroom: c.classroom, phone: c.phone, email: c.email, photo: c.photo || '',
+                subjects: subs.map(s => s.subject_name),
+                sbd: c.sbd || '', rooms, scores, dtb: c.dtb || '',
+                phuctra: c.phuctra || 'Không', phuctraStatus: c.phuctra_status || 'Chưa phúc tra',
+                phuctraHistory: history, status: c.status || 'Chưa xét', rank: c.rank || ''
+            };
+        });
+
+        const { data: membersRaw } = await supabaseClient
+            .from('members').select('*').order('created_at', { ascending: false });
+        const { data: activitiesRaw } = await supabaseClient
+            .from('member_activities').select('*').order('date', { ascending: true });
+
+        memberList = (membersRaw || []).map(m => ({
+            id: m.id, fullname: m.fullname, dob: m.dob, gender: m.gender, classroom: m.classroom,
+            schoolclub: m.schoolclub, role: m.role, phone: m.phone, email: m.email,
+            instruments: m.instruments, joindate: m.joindate, examdate: m.examdate, photo: m.photo || '',
+            activities: (activitiesRaw || []).filter(a => a.member_id === m.id).map(a => ({ date: a.date, content: a.content, _dbId: a.id }))
+        }));
+    } catch (err) {
+        console.error('Lỗi tải dữ liệu từ Supabase:', err);
+    }
 }
 
-function saveCandidates(broadcast = true) {
-    localStorage.setItem(CANDIDATE_STORAGE, JSON.stringify(candidateList));
+// Đăng ký lắng nghe Realtime: bất kỳ máy nào khác thay đổi dữ liệu,
+// mọi máy còn lại tự tải lại và render lại ngay (không cần bấm gì).
+function setupRealtimeSync() {
+    if (realtimeChannel) return; // tránh đăng ký trùng
+    realtimeChannel = supabaseClient.channel('guitar-club-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, handleRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'candidate_subjects' }, handleRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'candidate_reappeals' }, handleRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, handleRealtimeChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'member_activities' }, handleRealtimeChange)
+        .subscribe();
+}
+
+function handleRealtimeChange() {
+    // Gộp nhiều sự kiện đến gần nhau (vd sửa 1 hồ sơ đụng nhiều bảng) thành 1 lần tải lại
+    clearTimeout(realtimeReloadTimer);
+    realtimeReloadTimer = setTimeout(async () => {
+        await loadInitialData();
+        updateReappealBadges();
+        if (!document.getElementById('admin-modal').classList.contains('hidden')) {
+            renderAdminCandidates(); renderAdminReappeals(); renderAdminMembers();
+        }
+        if (currentLookupCandidateId && !document.getElementById('lookup-card-detail').classList.contains('hidden')) {
+            searchCandidate();
+        }
+        if (currentLookupMemberId && !document.getElementById('book-form-container').classList.contains('hidden')) {
+            searchMemberBook();
+        }
+    }, 400);
+}
+
+// Helper: tải lại dữ liệu + cập nhật badge + render lại khu quản trị (nếu đang mở)
+async function reloadAndRenderCandidates() {
+    await loadInitialData();
     updateReappealBadges();
     if (!document.getElementById('admin-modal').classList.contains('hidden')) { renderAdminCandidates(); renderAdminReappeals(); }
-    if (broadcast) syncChannel.postMessage({ type: 'DATA_UPDATED' });
 }
-
-function saveMembers(broadcast = true) {
-    localStorage.setItem(MEMBER_STORAGE, JSON.stringify(memberList));
+async function reloadAndRenderMembers() {
+    await loadInitialData();
     if (!document.getElementById('admin-modal').classList.contains('hidden')) { renderAdminMembers(); }
-    if (broadcast) syncChannel.postMessage({ type: 'DATA_UPDATED' });
 }
 
 function updateReappealBadges() {
@@ -427,30 +462,74 @@ function previewRegisterMemberImage(event) {
 
 function toggleSubmitBtn() {
     const isChecked = document.getElementById('commitment-check').checked; const btn = document.getElementById('submitBtn');
-    if (isChecked) { btn.disabled = false; btn.className = "w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"; } 
+    if (isChecked) { btn.disabled = false; btn.className = "w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"; }
     else { btn.disabled = true; btn.className = "w-full sm:w-auto bg-slate-300 text-white font-bold py-3.5 px-8 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm cursor-not-allowed"; }
 }
 
 function validateSubjectSelection() {}
 
-function handleRegister(e) {
+// --- ĐĂNG KÝ DỰ TUYỂN (Insert vào candidates + candidate_subjects) ---
+async function handleRegister(e) {
     e.preventDefault();
     const optSubject = document.querySelector('input[name="optional-subject"]:checked');
     if (!optSubject) { alert('Vui lòng chọn 1 trong 3 môn còn lại!'); return; }
-    const candidateData = {
-        id: 'HB' + Date.now().toString().slice(-6), fullname: document.getElementById('fullname').value.trim(), dob: document.getElementById('dob').value, gender: document.getElementById('gender').value, school: document.getElementById('school').value.trim(), classroom: document.getElementById('classroom').value.trim(), phone: document.getElementById('phone').value.trim(), email: document.getElementById('email').value.trim(), photo: currentPhotoBase64, subjects: ["Lý thuyết âm nhạc", optSubject.value], sbd: '', rooms: {}, scores: {}, dtb: '', phuctra: 'Không', phuctraStatus: 'Chưa phúc tra', phuctraHistory: [], status: 'Chưa xét', rank: ''
+
+    const newId = 'HB' + Date.now().toString().slice(-6);
+    const candidateRow = {
+        id: newId, fullname: document.getElementById('fullname').value.trim(), dob: document.getElementById('dob').value,
+        gender: document.getElementById('gender').value, school: document.getElementById('school').value.trim(),
+        classroom: document.getElementById('classroom').value.trim(), phone: document.getElementById('phone').value.trim(),
+        email: document.getElementById('email').value.trim(), photo: currentPhotoBase64,
+        sbd: '', dtb: '', phuctra: 'Không', phuctra_status: 'Chưa phúc tra', status: 'Chưa xét', rank: ''
     };
-    candidateList.push(candidateData); saveCandidates(true);
-    alert(`Đăng ký dự tuyển thành công!\nMã phiếu của bạn là: ${candidateData.id}`); renderPrintCard(candidateData, false);
+    const subjectRows = [
+        { candidate_id: newId, subject_name: 'Lý thuyết âm nhạc', room: '', score: '' },
+        { candidate_id: newId, subject_name: optSubject.value, room: '', score: '' }
+    ];
+
+    try {
+        const { error: insErr } = await supabaseClient.from('candidates').insert(candidateRow);
+        if (insErr) throw insErr;
+        const { error: subErr } = await supabaseClient.from('candidate_subjects').insert(subjectRows);
+        if (subErr) throw subErr;
+
+        await reloadAndRenderCandidates();
+        alert(`Đăng ký dự tuyển thành công!\nMã phiếu của bạn là: ${newId}`);
+        renderPrintCard({
+            ...candidateRow,
+            subjects: subjectRows.map(s => s.subject_name),
+            rooms: {}, scores: {}, phuctraHistory: []
+        }, false);
+    } catch (err) {
+        alert('Lỗi khi gửi hồ sơ: ' + err.message);
+    }
 }
 
-function handleRegisterMemberBook(e) {
+// --- LẬP SỔ THÀNH VIÊN MỚI (Insert vào members + member_activities) ---
+async function handleRegisterMemberBook(e) {
     e.preventDefault();
-    const newMember = {
-        id: 'HB' + Date.now().toString().slice(-6), fullname: document.getElementById('reg-m-fullname').value.trim(), dob: document.getElementById('reg-m-dob').value, gender: document.getElementById('reg-m-gender').value, classroom: document.getElementById('reg-m-classroom').value.trim(), schoolclub: document.getElementById('reg-m-schoolclub').value.trim(), role: 'Thành viên', phone: document.getElementById('reg-m-phone').value.trim(), email: document.getElementById('reg-m-email').value.trim(), instruments: document.getElementById('reg-m-instruments').value.trim(), joindate: document.getElementById('reg-m-joindate').value, examdate: document.getElementById('reg-m-examdate').value, photo: currentRegMemberPhotoBase64, activities: [{ date: document.getElementById('reg-m-joindate').value, content: "Chính thức lập sổ thành viên CLB." }]
+    const newId = 'HB' + Date.now().toString().slice(-6);
+    const joindate = document.getElementById('reg-m-joindate').value;
+    const memberRow = {
+        id: newId, fullname: document.getElementById('reg-m-fullname').value.trim(), dob: document.getElementById('reg-m-dob').value,
+        gender: document.getElementById('reg-m-gender').value, classroom: document.getElementById('reg-m-classroom').value.trim(),
+        schoolclub: document.getElementById('reg-m-schoolclub').value.trim(), role: 'Thành viên',
+        phone: document.getElementById('reg-m-phone').value.trim(), email: document.getElementById('reg-m-email').value.trim(),
+        instruments: document.getElementById('reg-m-instruments').value.trim(), joindate: joindate,
+        examdate: document.getElementById('reg-m-examdate').value, photo: currentRegMemberPhotoBase64
     };
-    memberList.push(newMember); saveMembers(true);
-    alert(`Đăng ký lập sổ thành công!\nMã số thành viên: ${newMember.id}`); document.getElementById('registerMemberForm').reset(); switchTab('member-book');
+
+    try {
+        const { error: insErr } = await supabaseClient.from('members').insert(memberRow);
+        if (insErr) throw insErr;
+        await supabaseClient.from('member_activities').insert({ member_id: newId, date: joindate, content: "Chính thức lập sổ thành viên CLB." });
+
+        await reloadAndRenderMembers();
+        alert(`Đăng ký lập sổ thành công!\nMã số thành viên: ${newId}`);
+        document.getElementById('registerMemberForm').reset(); switchTab('member-book');
+    } catch (err) {
+        alert('Lỗi đăng ký: ' + err.message);
+    }
 }
 
 function hasScores(c) { if (!c || !c.scores) return false; let vals = Object.values(c.scores); if (vals.length === 0) return false; return vals.some(v => v !== '' && v !== null && v !== undefined); }
@@ -476,8 +555,8 @@ function renderPrintCard(data, isFromAdmin = false) {
     const conclusionContainer = document.getElementById('p-conclusion-container'); const rankContainer = document.getElementById('p-rank-container');
     if (hasScores(data) && data.status && data.status !== 'Chưa xét') {
         conclusionContainer.classList.remove('hidden');
-        if (data.status === 'ĐỦ') { document.getElementById('p-conclusion').innerHTML = `<span class="text-emerald-600 font-bold uppercase">ĐỦ</span> điều kiện trở thành thành viên`; rankContainer.classList.remove('hidden'); document.getElementById('p-rank').innerHTML = `<span class="font-bold uppercase">${data.rank || 'CHÍNH THỨC'}</span>`; } 
-        else if (data.status === 'KHÔNG ĐỦ') { document.getElementById('p-conclusion').innerHTML = `<span class="text-rose-600 font-bold uppercase">KHÔNG ĐỦ</span> điều kiện`; rankContainer.classList.add('hidden'); } 
+        if (data.status === 'ĐỦ') { document.getElementById('p-conclusion').innerHTML = `<span class="text-emerald-600 font-bold uppercase">ĐỦ</span> điều kiện trở thành thành viên`; rankContainer.classList.remove('hidden'); document.getElementById('p-rank').innerHTML = `<span class="font-bold uppercase">${data.rank || 'CHÍNH THỨC'}</span>`; }
+        else if (data.status === 'KHÔNG ĐỦ') { document.getElementById('p-conclusion').innerHTML = `<span class="text-rose-600 font-bold uppercase">KHÔNG ĐỦ</span> điều kiện`; rankContainer.classList.add('hidden'); }
         else { conclusionContainer.classList.add('hidden'); rankContainer.classList.add('hidden'); }
     } else { conclusionContainer.classList.add('hidden'); rankContainer.classList.add('hidden'); }
     const printHistoryContainer = document.getElementById('p-phuctra-history-print'); printHistoryContainer.innerHTML = ''; const history = data.phuctraHistory || [];
@@ -487,8 +566,8 @@ function renderPrintCard(data, isFromAdmin = false) {
 
 function closePrintCard() { document.getElementById('print-area').classList.add('hidden'); switchTab('lookup'); }
 
-function searchCandidate() {
-    loadInitialData(); const keyword = document.getElementById('lookup-keyword').value.trim().toLowerCase(); const msgDiv = document.getElementById('lookup-result-msg'); const cardDetail = document.getElementById('lookup-card-detail');
+async function searchCandidate() {
+    await loadInitialData(); const keyword = document.getElementById('lookup-keyword').value.trim().toLowerCase(); const msgDiv = document.getElementById('lookup-result-msg'); const cardDetail = document.getElementById('lookup-card-detail');
     if (!keyword) { alert('Vui lòng nhập Mã phiếu, SĐT hoặc Email!'); return; }
     const found = candidateList.find(c => String(c.id).toLowerCase() === keyword || String(c.phone).toLowerCase() === keyword || String(c.email).toLowerCase() === keyword);
     if (found) {
@@ -497,11 +576,11 @@ function searchCandidate() {
         const roomsScoresContainer = document.getElementById('lk-rooms-scores-container'); roomsScoresContainer.innerHTML = ''; const subs = found.subjects || [];
         subs.forEach(s => { const rVal = found.rooms && found.rooms[s] ? found.rooms[s] : 'Chưa xếp'; const scVal = found.scores && found.scores[s] !== undefined && found.scores[s] !== '' ? found.scores[s] : '-'; const div = document.createElement('div'); div.className = "p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center shadow-sm"; div.innerHTML = `<div><strong class="text-slate-800 block">${s}</strong><span class="text-xs text-slate-500">Phòng thi: <strong class="text-amber-600">${rVal}</strong></span></div><div class="text-right"><span class="text-xs text-slate-400 block">Điểm số</span><span class="font-extrabold text-slate-800 text-xl">${scVal}</span></div>`; roomsScoresContainer.appendChild(div); });
         const dtbVal = calculateDTB(found.scores, subs); document.getElementById('lk-dtb').innerText = dtbVal !== '' ? dtbVal : 'Chưa có';
-        if (!hasScores(found)) { conclusionBox.classList.add('hidden'); rankBox.classList.add('hidden'); rBadge.classList.add('hidden'); tag.innerText = "(Chưa công bố điểm)"; phuctraSec.classList.add('hidden'); } 
-        else if (!found.status || found.status === 'Chưa xét') { conclusionBox.classList.remove('hidden'); document.getElementById('lk-conclusion').innerHTML = `<span class="text-slate-600 font-bold uppercase">chưa công bố</span>`; rankBox.classList.add('hidden'); rBadge.classList.add('hidden'); tag.innerText = "(Đã có điểm - Chờ kết luận)"; phuctraSec.classList.remove('hidden'); } 
+        if (!hasScores(found)) { conclusionBox.classList.add('hidden'); rankBox.classList.add('hidden'); rBadge.classList.add('hidden'); tag.innerText = "(Chưa công bố điểm)"; phuctraSec.classList.add('hidden'); }
+        else if (!found.status || found.status === 'Chưa xét') { conclusionBox.classList.remove('hidden'); document.getElementById('lk-conclusion').innerHTML = `<span class="text-slate-600 font-bold uppercase">chưa công bố</span>`; rankBox.classList.add('hidden'); rBadge.classList.add('hidden'); tag.innerText = "(Đã có điểm - Chờ kết luận)"; phuctraSec.classList.remove('hidden'); }
         else {
             tag.innerText = "(Đã công bố kết quả)"; phuctraSec.classList.remove('hidden'); conclusionBox.classList.remove('hidden');
-            if (found.status === 'ĐỦ') { document.getElementById('lk-conclusion').innerHTML = `<span class="text-emerald-600 font-bold uppercase"><i class="fa-solid fa-circle-check"></i> ĐỦ điều kiện</span>`; document.getElementById('lk-rank').innerHTML = `<span class="font-bold uppercase">${found.rank || 'CHÍNH THỨC'}</span>`; rankBox.classList.remove('hidden'); rBadge.innerText = found.rank || 'CHÍNH THỨC'; rBadge.className = "px-5 py-2 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"; rBadge.classList.remove('hidden'); } 
+            if (found.status === 'ĐỦ') { document.getElementById('lk-conclusion').innerHTML = `<span class="text-emerald-600 font-bold uppercase"><i class="fa-solid fa-circle-check"></i> ĐỦ điều kiện</span>`; document.getElementById('lk-rank').innerHTML = `<span class="font-bold uppercase">${found.rank || 'CHÍNH THỨC'}</span>`; rankBox.classList.remove('hidden'); rBadge.innerText = found.rank || 'CHÍNH THỨC'; rBadge.className = "px-5 py-2 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"; rBadge.classList.remove('hidden'); }
             else { document.getElementById('lk-conclusion').innerHTML = `<span class="text-rose-600 font-bold uppercase"><i class="fa-solid fa-circle-xmark"></i> KHÔNG ĐỦ điều kiện</span>`; rankBox.classList.add('hidden'); rBadge.innerText = 'KHÔNG ĐỦ'; rBadge.className = "px-5 py-2 rounded-xl text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200"; rBadge.classList.remove('hidden'); }
         }
         const historyBox = document.getElementById('lookup-reappeal-history-container'); const historyList = document.getElementById('lookup-reappeal-history-list'); historyList.innerHTML = ''; const historyArr = found.phuctraHistory || [];
@@ -530,21 +609,39 @@ function togglePhucTraForm() {
     } else { box.classList.add('hidden'); }
 }
 
-function handleSubmitPhucTra(e) {
-    e.preventDefault(); const checkedSubs = Array.from(document.querySelectorAll('input[name="phuctra-sub"]:checked')).map(el => el.value);
+// --- GỬI ĐƠN PHÚC TRA (Insert vào candidate_reappeals + update candidates) ---
+async function handleSubmitPhucTra(e) {
+    e.preventDefault();
+    const checkedSubs = Array.from(document.querySelectorAll('input[name="phuctra-sub"]:checked')).map(el => el.value);
     if (checkedSubs.length === 0) { alert('Vui lòng chọn ít nhất 1 môn xin phúc tra!'); return; }
-    const contentText = document.getElementById('phuctra-content-input').value.trim(); const candidate = candidateList.find(c => String(c.id) === String(currentLookupCandidateId)); if (!candidate) return;
-    if (!candidate.phuctraHistory) candidate.phuctraHistory = [];
-    candidate.phuctraHistory.push({ date: new Date().toLocaleDateString('vi-VN'), subjects: checkedSubs, content: `Môn: [${checkedSubs.join(', ')}]. Lý do: ${contentText}`, status: 'Đang chờ', response: '' });
-    candidate.phuctra = `Xin phúc tra ${checkedSubs.join(', ')}`; candidate.phuctraStatus = 'Đang chờ';
-    saveCandidates(true); alert('Gửi yêu cầu phúc tra thành công!'); togglePhucTraForm(); searchCandidate();
+    const contentText = document.getElementById('phuctra-content-input').value.trim();
+    const candidate = candidateList.find(c => String(c.id) === String(currentLookupCandidateId));
+    if (!candidate) return;
+
+    try {
+        const { error: insErr } = await supabaseClient.from('candidate_reappeals').insert({
+            candidate_id: candidate.id,
+            date: new Date().toLocaleDateString('vi-VN'),
+            subjects: checkedSubs.join(', '),
+            content: `Môn: [${checkedSubs.join(', ')}]. Lý do: ${contentText}`,
+            status: 'Đang chờ', response: ''
+        });
+        if (insErr) throw insErr;
+        const { error: updErr } = await supabaseClient.from('candidates').update({ phuctra_status: 'Đang chờ' }).eq('id', candidate.id);
+        if (updErr) throw updErr;
+
+        await reloadAndRenderCandidates();
+        alert('Gửi yêu cầu phúc tra thành công!'); togglePhucTraForm(); searchCandidate();
+    } catch (err) {
+        alert('Lỗi gửi phúc tra: ' + err.message);
+    }
 }
 
 function viewLookupCandidatePrint() { const candidate = candidateList.find(c => String(c.id) === String(currentLookupCandidateId)); if (candidate) { renderPrintCard(candidate, false); } }
 function triggerPrintCandidateCard() { document.body.classList.add('print-candidate-mode'); window.print(); document.body.classList.remove('print-candidate-mode'); }
 
-function searchMemberBook() {
-    loadInitialData(); const keyword = document.getElementById('member-lookup-keyword').value.trim().toLowerCase(); const msgDiv = document.getElementById('member-lookup-result-msg'); const bookContainer = document.getElementById('book-form-container');
+async function searchMemberBook() {
+    await loadInitialData(); const keyword = document.getElementById('member-lookup-keyword').value.trim().toLowerCase(); const msgDiv = document.getElementById('member-lookup-result-msg'); const bookContainer = document.getElementById('book-form-container');
     if (!keyword) { alert('Vui lòng nhập Mã TV, SĐT hoặc Email!'); return; }
     const found = memberList.find(m => String(m.id).toLowerCase() === keyword || String(m.phone).toLowerCase() === keyword || String(m.email).toLowerCase() === keyword);
     if (found) {
@@ -562,9 +659,9 @@ function searchMemberBook() {
 function triggerPrintMemberBook() { document.body.classList.add('print-member-mode'); window.print(); document.body.classList.remove('print-member-mode'); }
 
 // --- KHU VỰC QUẢN TRỊ ---
-function openAdminModal() { 
+function openAdminModal() {
     const modal = document.getElementById('admin-modal');
-    modal.classList.remove('hidden'); 
+    modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => {
         modal.classList.remove('opacity-0');
@@ -574,14 +671,14 @@ function openAdminModal() {
     }, 10);
 }
 
-function closeAdminModal() { 
+function closeAdminModal() {
     const modal = document.getElementById('admin-modal');
     modal.classList.add('opacity-0');
     const box = document.getElementById('admin-modal-box');
     if(box) box.classList.add('scale-95');
     setTimeout(() => {
-        modal.classList.add('hidden'); 
-        modal.classList.remove('flex'); 
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
     }, 300);
 }
 
@@ -591,10 +688,10 @@ function switchAdminTab(subTab) {
         const btn = document.getElementById(id);
         if(btn) btn.className = btn.id.includes('roles') ? "px-5 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap" : "px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap";
     });
-    
+
     const sec = document.getElementById(`admin-section-${subTab}`);
     if(sec) sec.classList.remove('hidden');
-    
+
     const activeBtn = document.getElementById(`admin-tab-btn-${subTab}`);
     if(activeBtn) {
         activeBtn.className = subTab === 'roles' ? "px-5 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-md" : "px-5 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold transition-colors relative flex items-center gap-1.5 whitespace-nowrap shadow-md";
@@ -607,7 +704,7 @@ function switchAdminTab(subTab) {
 }
 
 function renderAdminCandidates() {
-    loadInitialData(); const tbody = document.getElementById('admin-table-body'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-table-body'); tbody.innerHTML = '';
     let total = candidateList.length, ltanCount = 0, gcdCount = 0, otherCount = 0;
     candidateList.forEach(c => {
         const subs = c.subjects || []; if (subs.includes('Lý thuyết âm nhạc')) ltanCount++; if (subs.includes('Guitar cổ điển')) gcdCount++; if (subs.includes('Guitar đệm hát') || subs.includes('Thanh nhạc')) otherCount++;
@@ -629,7 +726,7 @@ function filterAdminTable() {
 }
 
 function renderAdminReappeals() {
-    loadInitialData(); const tbody = document.getElementById('admin-reappeals-table-body'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-reappeals-table-body'); tbody.innerHTML = '';
     const reappealList = candidateList.filter(c => c.phuctraStatus === 'Đang chờ' || (c.phuctraHistory && c.phuctraHistory.some(h => h.status === 'Đang chờ')));
     if (reappealList.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-medium">Không có yêu cầu phúc tra nào.</td></tr>`; return; }
     reappealList.forEach(c => {
@@ -654,24 +751,49 @@ function openReappealRespondModal(id) {
 
 function closeReappealRespondModal() { document.getElementById('reappeal-respond-modal').classList.add('hidden'); document.getElementById('reappeal-respond-modal').classList.remove('flex'); }
 
-function acceptReappeal() {
+// --- DUYỆT PHÚC TRA (Update điểm trong candidate_subjects + candidates + candidate_reappeals) ---
+async function acceptReappeal() {
     const id = document.getElementById('resp-candidate-id').value; const c = candidateList.find(item => item.id === id); if (!c) return;
-    let newScores = { ...c.scores };
-    (c.subjects || []).forEach(sub => { const inputEl = document.getElementById(`resp-score-${sub}`); if (inputEl) { newScores[sub] = inputEl.value; } });
-    c.scores = newScores; c.dtb = calculateDTB(c.scores, c.subjects); c.phuctraStatus = 'Đã duyệt';
-    if (c.phuctraHistory && c.phuctraHistory.length > 0) { let latest = c.phuctraHistory[c.phuctraHistory.length - 1]; latest.status = 'Đã duyệt'; latest.response = document.getElementById('resp-note-input').value.trim() || 'Đã kiểm tra lại bài thi, điểm số đã được cập nhật chính thức.'; }
-    saveCandidates(true); alert('Đã cập nhật điểm mới và phản hồi thành công đến thí sinh!'); closeReappealRespondModal(); renderAdminReappeals(); renderAdminCandidates();
+    const newScores = { ...c.scores };
+    (c.subjects || []).forEach(sub => { const el = document.getElementById(`resp-score-${sub}`); if (el) newScores[sub] = el.value; });
+    const newDtb = calculateDTB(newScores, c.subjects);
+    const responseText = document.getElementById('resp-note-input').value.trim() || 'Đã kiểm tra lại bài thi, điểm số đã được cập nhật chính thức.';
+    const latest = (c.phuctraHistory || []).slice(-1)[0];
+
+    try {
+        for (const sub of (c.subjects || [])) {
+            await supabaseClient.from('candidate_subjects').update({ score: newScores[sub] || '' }).eq('candidate_id', id).eq('subject_name', sub);
+        }
+        await supabaseClient.from('candidates').update({ dtb: newDtb, phuctra_status: 'Đã duyệt' }).eq('id', id);
+        if (latest && latest._dbId) {
+            await supabaseClient.from('candidate_reappeals').update({ status: 'Đã duyệt', response: responseText }).eq('id', latest._dbId);
+        }
+        await reloadAndRenderCandidates();
+        alert('Đã cập nhật điểm mới và phản hồi thành công đến thí sinh!'); closeReappealRespondModal(); renderAdminReappeals(); renderAdminCandidates();
+    } catch (err) {
+        alert('Lỗi cập nhật: ' + err.message);
+    }
 }
 
-function rejectReappeal() {
+async function rejectReappeal() {
     const id = document.getElementById('resp-candidate-id').value; const c = candidateList.find(item => item.id === id); if (!c) return;
-    c.phuctraStatus = 'Từ chối';
-    if (c.phuctraHistory && c.phuctraHistory.length > 0) { let latest = c.phuctraHistory[c.phuctraHistory.length - 1]; latest.status = 'Từ chối'; latest.response = document.getElementById('resp-note-input').value.trim() || 'Bài chấm đã đúng đáp án, giữ nguyên điểm cũ.'; }
-    saveCandidates(true); alert('Đã từ chối đơn phúc tra (giữ nguyên điểm) và gửi phản hồi.'); closeReappealRespondModal(); renderAdminReappeals(); renderAdminCandidates();
+    const responseText = document.getElementById('resp-note-input').value.trim() || 'Bài chấm đã đúng đáp án, giữ nguyên điểm cũ.';
+    const latest = (c.phuctraHistory || []).slice(-1)[0];
+
+    try {
+        await supabaseClient.from('candidates').update({ phuctra_status: 'Từ chối' }).eq('id', id);
+        if (latest && latest._dbId) {
+            await supabaseClient.from('candidate_reappeals').update({ status: 'Từ chối', response: responseText }).eq('id', latest._dbId);
+        }
+        await reloadAndRenderCandidates();
+        alert('Đã từ chối đơn phúc tra (giữ nguyên điểm) và gửi phản hồi.'); closeReappealRespondModal(); renderAdminReappeals(); renderAdminCandidates();
+    } catch (err) {
+        alert('Lỗi cập nhật: ' + err.message);
+    }
 }
 
 function renderAdminMembers() {
-    loadInitialData(); const tbody = document.getElementById('admin-member-table-body'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-member-table-body'); tbody.innerHTML = '';
     let totalM = memberList.length; let bcnM = memberList.filter(m => m.role === 'Chủ nhiệm' || m.role === 'Phó chủ nhiệm').length; let regM = totalM - bcnM;
     memberList.forEach(m => {
         const tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 transition-colors";
@@ -687,10 +809,25 @@ function filterAdminMemberTable() {
     for (let r of rows) { const text = r.innerText.toLowerCase(); const matchKeyword = text.includes(keyword); const matchRole = roleFilter === "" || text.includes(roleFilter.toLowerCase()); if (matchKeyword && matchRole) { r.style.display = ""; } else { r.style.display = "none"; } }
 }
 
-function openAddCandidateModal() {
+// --- THÊM THÍ SINH MỚI (Admin) ---
+async function openAddCandidateModal() {
     const newId = 'HB' + Date.now().toString().slice(-6);
-    candidateList.push({ id: newId, fullname: "Thí sinh mới", dob: "2008-01-01", gender: "Nam", school: "THPT Hồng Bàng", classroom: "10A1", phone: "0900000000", email: "new@gmail.com", photo: "", subjects: ["Lý thuyết âm nhạc", "Guitar cổ điển"], sbd: "CGC-" + Math.floor(100 + Math.random() * 900), rooms: { "Lý thuyết âm nhạc": "P.101", "Guitar cổ điển": "P.102" }, scores: { "Lý thuyết âm nhạc": "", "Guitar cổ điển": "" }, dtb: "", phuctra: "Không", phuctraStatus: "Chưa phúc tra", phuctraHistory: [], status: "Chưa xét", rank: "" });
-    saveCandidates(true); openEditModal(newId);
+    try {
+        await supabaseClient.from('candidates').insert({
+            id: newId, fullname: "Thí sinh mới", dob: "2008-01-01", gender: "Nam", school: "THPT Hồng Bàng",
+            classroom: "10A1", phone: "0900000000", email: "new@gmail.com", photo: "",
+            sbd: "CGC-" + Math.floor(100 + Math.random() * 900), dtb: "", phuctra: "Không",
+            phuctra_status: "Chưa phúc tra", status: "Chưa xét", rank: ""
+        });
+        await supabaseClient.from('candidate_subjects').insert([
+            { candidate_id: newId, subject_name: "Lý thuyết âm nhạc", room: "P.101", score: "" },
+            { candidate_id: newId, subject_name: "Guitar cổ điển", room: "P.102", score: "" }
+        ]);
+        await reloadAndRenderCandidates();
+        openEditModal(newId);
+    } catch (err) {
+        alert('Lỗi tạo hồ sơ: ' + err.message);
+    }
 }
 
 function openEditModal(id) {
@@ -709,23 +846,70 @@ function closeEditModal() { document.getElementById('edit-modal').classList.add(
 
 function toggleRankVisibility() { const status = document.getElementById('edit-status').value; const rankBox = document.getElementById('edit-rank-box'); if (status === 'ĐỦ') { rankBox.classList.remove('hidden'); } else { rankBox.classList.add('hidden'); } }
 
-function handleSaveEdit(e) {
+// --- LƯU SỬA HỒ SƠ THÍ SINH (Update candidates + thay toàn bộ candidate_subjects) ---
+async function handleSaveEdit(e) {
     e.preventDefault(); const id = document.getElementById('edit-id').value; const c = candidateList.find(item => item.id === id); if (!c) return;
     const optRadio = document.querySelector('input[name="edit-optional-sub"]:checked'); const optSubVal = optRadio ? optRadio.value : "Guitar cổ điển"; const newSubs = ["Lý thuyết âm nhạc", optSubVal];
-    c.fullname = document.getElementById('edit-fullname').value.trim(); c.dob = document.getElementById('edit-dob').value; c.gender = document.getElementById('edit-gender').value; c.classroom = document.getElementById('edit-classroom').value.trim(); c.phone = document.getElementById('edit-phone').value.trim(); c.email = document.getElementById('edit-email').value.trim(); c.sbd = document.getElementById('edit-sbd').value.trim(); c.subjects = newSubs; c.phuctra = document.getElementById('edit-phuctra').value.trim(); c.status = document.getElementById('edit-status').value; c.rank = document.getElementById('edit-rank').value;
-    let newRooms = {}; newSubs.forEach(sub => { const el = document.getElementById(`edit-room-${sub}`); if (el) newRooms[sub] = el.value.trim(); }); c.rooms = newRooms;
-    let newScores = {}; newSubs.forEach(sub => { const el = document.getElementById(`edit-score-${sub}`); if (el) newScores[sub] = el.value.trim(); }); c.scores = newScores; c.dtb = calculateDTB(c.scores, c.subjects);
-    saveCandidates(true); alert('Lưu hồ sơ thành công!'); closeEditModal(); renderAdminCandidates();
+
+    let newRooms = {}; newSubs.forEach(sub => { const el = document.getElementById(`edit-room-${sub}`); if (el) newRooms[sub] = el.value.trim(); });
+    let newScores = {}; newSubs.forEach(sub => { const el = document.getElementById(`edit-score-${sub}`); if (el) newScores[sub] = el.value.trim(); });
+    const newDtb = calculateDTB(newScores, newSubs);
+
+    const updatedRow = {
+        fullname: document.getElementById('edit-fullname').value.trim(), dob: document.getElementById('edit-dob').value,
+        gender: document.getElementById('edit-gender').value, classroom: document.getElementById('edit-classroom').value.trim(),
+        phone: document.getElementById('edit-phone').value.trim(), email: document.getElementById('edit-email').value.trim(),
+        sbd: document.getElementById('edit-sbd').value.trim(), phuctra: document.getElementById('edit-phuctra').value.trim(),
+        status: document.getElementById('edit-status').value, rank: document.getElementById('edit-rank').value, dtb: newDtb
+    };
+
+    try {
+        await supabaseClient.from('candidates').update(updatedRow).eq('id', id);
+        await supabaseClient.from('candidate_subjects').delete().eq('candidate_id', id);
+        await supabaseClient.from('candidate_subjects').insert(newSubs.map(sub => ({
+            candidate_id: id, subject_name: sub, room: newRooms[sub] || '', score: newScores[sub] || ''
+        })));
+        await reloadAndRenderCandidates();
+        alert('Lưu hồ sơ thành công!'); closeEditModal(); renderAdminCandidates();
+    } catch (err) {
+        alert('Lỗi lưu hồ sơ: ' + err.message);
+    }
 }
 
 function printCandidateFromAdmin(id) { const c = candidateList.find(item => item.id === id); if (c) { closeAdminModal(); renderPrintCard(c, true); } }
-function deleteCandidate(id) { if (confirm('Chắc chắn muốn xóa thí sinh này?')) { candidateList = candidateList.filter(item => item.id !== id); saveCandidates(true); renderAdminCandidates(); } }
-function deleteAllCandidates() { if (confirm('CẢNH BÁO: Xóa tất cả hồ sơ thí sinh?')) { candidateList = []; saveCandidates(true); renderAdminCandidates(); } }
 
-function openMemberAddModal() {
+async function deleteCandidate(id) {
+    if (!confirm('Chắc chắn muốn xóa thí sinh này?')) return;
+    try {
+        await supabaseClient.from('candidates').delete().eq('id', id);
+        await reloadAndRenderCandidates(); renderAdminCandidates();
+    } catch (err) { alert('Lỗi xóa: ' + err.message); }
+}
+
+async function deleteAllCandidates() {
+    if (!confirm('CẢNH BÁO: Xóa tất cả hồ sơ thí sinh?')) return;
+    try {
+        await supabaseClient.from('candidates').delete().neq('id', '__none__');
+        await reloadAndRenderCandidates(); renderAdminCandidates();
+    } catch (err) { alert('Lỗi xóa: ' + err.message); }
+}
+
+// --- THÊM SỔ THÀNH VIÊN MỚI (Admin) ---
+async function openMemberAddModal() {
     const newId = 'HB' + Date.now().toString().slice(-6);
-    memberList.push({ id: newId, fullname: "Thành viên mới", dob: "2008-01-01", gender: "Nam", classroom: "10A1", schoolclub: "CLB Guitar Cổ Điển", role: "Thành viên", phone: "0900000000", email: "member@gmail.com", instruments: "Guitar Cổ Điển", joindate: new Date().toISOString().split('T')[0], examdate: new Date().toISOString().split('T')[0], photo: "", activities: [{ date: new Date().toISOString().split('T')[0], content: "Chính thức gia nhập Câu lạc bộ." }] });
-    saveMembers(true); openMemberModal(newId);
+    const today = new Date().toISOString().split('T')[0];
+    try {
+        await supabaseClient.from('members').insert({
+            id: newId, fullname: "Thành viên mới", dob: "2008-01-01", gender: "Nam", classroom: "10A1",
+            schoolclub: "CLB Guitar Cổ Điển", role: "Thành viên", phone: "0900000000", email: "member@gmail.com",
+            instruments: "Guitar Cổ Điển", joindate: today, examdate: today, photo: ""
+        });
+        await supabaseClient.from('member_activities').insert({ member_id: newId, date: today, content: "Chính thức gia nhập Câu lạc bộ." });
+        await reloadAndRenderMembers();
+        openMemberModal(newId);
+    } catch (err) {
+        alert('Lỗi tạo sổ: ' + err.message);
+    }
 }
 
 function openMemberModal(id) {
@@ -750,16 +934,39 @@ function addActivityRow() {
     div.innerHTML = `<input type="date" value="${today}" class="act-date px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"><input type="text" value="Ghi nhận hoạt động..." class="act-content flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"><button type="button" onclick="this.parentElement.remove()" class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center font-bold transition-colors"><i class="fa-solid fa-xmark"></i></button>`; container.appendChild(div);
 }
 
-function handleSaveMember(e) {
+// --- LƯU SỬA SỔ THÀNH VIÊN (Update members + thay toàn bộ member_activities) ---
+async function handleSaveMember(e) {
     e.preventDefault(); const id = document.getElementById('edit-member-id').value; const m = memberList.find(item => item.id === id); if (!m) return;
-    m.fullname = document.getElementById('m-fullname').value.trim(); m.dob = document.getElementById('m-dob').value; m.gender = document.getElementById('m-gender').value; m.classroom = document.getElementById('m-classroom').value.trim(); m.role = document.getElementById('m-role').value; m.phone = document.getElementById('m-phone').value.trim(); m.email = document.getElementById('m-email').value.trim(); m.instruments = document.getElementById('m-instruments').value.trim(); m.joindate = document.getElementById('m-joindate').value;
+    const updatedRow = {
+        fullname: document.getElementById('m-fullname').value.trim(), dob: document.getElementById('m-dob').value,
+        gender: document.getElementById('m-gender').value, classroom: document.getElementById('m-classroom').value.trim(),
+        role: document.getElementById('m-role').value, phone: document.getElementById('m-phone').value.trim(),
+        email: document.getElementById('m-email').value.trim(), instruments: document.getElementById('m-instruments').value.trim(),
+        joindate: document.getElementById('m-joindate').value
+    };
     let newActs = []; const rows = document.querySelectorAll('#activities-input-list > div');
-    rows.forEach(r => { const d = r.querySelector('.act-date').value; const c = r.querySelector('.act-content').value.trim(); if (c) { newActs.push({ date: d, content: c }); } });
-    m.activities = newActs; saveMembers(true); alert('Lưu sổ thành viên thành công!'); closeMemberModal(); renderAdminMembers();
+    rows.forEach(r => { const d = r.querySelector('.act-date').value; const c = r.querySelector('.act-content').value.trim(); if (c) { newActs.push({ member_id: id, date: d, content: c }); } });
+
+    try {
+        await supabaseClient.from('members').update(updatedRow).eq('id', id);
+        await supabaseClient.from('member_activities').delete().eq('member_id', id);
+        if (newActs.length > 0) { await supabaseClient.from('member_activities').insert(newActs); }
+        await reloadAndRenderMembers();
+        alert('Lưu sổ thành viên thành công!'); closeMemberModal(); renderAdminMembers();
+    } catch (err) {
+        alert('Lỗi lưu sổ: ' + err.message);
+    }
 }
 
 function printMemberFromAdmin(id) { const m = memberList.find(item => item.id === id); if (m) { closeAdminModal(); switchTab('member-book'); document.getElementById('member-lookup-keyword').value = m.id; searchMemberBook(); } }
-function deleteMember(id) { if (confirm('Chắc chắn xóa sổ này?')) { memberList = memberList.filter(item => item.id !== id); saveMembers(true); renderAdminMembers(); } }
+
+async function deleteMember(id) {
+    if (!confirm('Chắc chắn xóa sổ này?')) return;
+    try {
+        await supabaseClient.from('members').delete().eq('id', id);
+        await reloadAndRenderMembers(); renderAdminMembers();
+    } catch (err) { alert('Lỗi xóa: ' + err.message); }
+}
 
 function exportCandidatesExcel() {
     let dataExport = candidateList.map(c => ({ "Mã Phiếu": c.id, "Họ Tên": c.fullname, "SBD": c.sbd, "Lớp": c.classroom, "Trường": c.school, "SĐT": c.phone, "Email": c.email, "Môn Thi": (c.subjects || []).join(', '), "Điểm TB": c.dtb, "Trạng Thái Xét Tuyển": c.status, "Xếp Loại": c.rank }));
